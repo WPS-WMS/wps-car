@@ -4,5 +4,5 @@
     "module": "commonjs",
     "moduleResolution": "node"
   },
-  "include": ["scripts/**/*.ts", "prisma/seed.ts"]
+  "include": ["scripts/**/*.ts", "prisma/seed.ts", "prisma/seed-helpers.ts"]
 }

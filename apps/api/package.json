@@ -17,12 +17,13 @@
     "prisma:validate": "prisma validate",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
+    "db:seed:beta": "ts-node --project tsconfig.scripts.json scripts/seed-beta-tenant.ts",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:e2e:vehicles": "jest --config ./test/jest-e2e.json --runInBand vehicles-create",
     "import:vehicles": "ts-node --project tsconfig.scripts.json scripts/bulk-import-vehicles.ts"
   },
   "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "ts-node --project tsconfig.scripts.json prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.3",
