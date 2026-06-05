@@ -7,8 +7,10 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { CommissionRuleType } from '@prisma/client';
 import { TENANT_USER_ROLES } from './create-user.dto';
@@ -37,6 +39,12 @@ export class UpdateUserDto {
     message: `Perfil deve ser um de: ${TENANT_USER_ROLES.join(', ')}`,
   })
   role?: (typeof TENANT_USER_ROLES)[number];
+
+  /** Filial do usuário; null = matriz (tenant) */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined && value !== '')
+  @IsUUID('4', { message: 'Filial inválida' })
+  branchId?: string | null;
 
   @IsOptional()
   @IsEnum(CommissionRuleType)

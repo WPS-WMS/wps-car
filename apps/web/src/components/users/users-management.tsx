@@ -26,7 +26,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { FormField, FormNativeSelect, FormTextarea } from '@/components/vehicles/form-field';
+import { BranchAssignmentField } from '@/components/users/branch-assignment-field';
 import { RoleBadge, StatusBadge } from '@/components/users/user-badges';
+import { branchIdToPayload, userBranchLabel } from '@/hooks/use-tenant-branch-options';
 import {
   Table,
   TableBody,
@@ -54,6 +56,7 @@ const createSchema = z.object({
   email: z.string().email('E-mail inválido'),
   password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
   role: z.enum(['ADMIN', 'MANAGER', 'SELLER']),
+  branchId: z.string(),
   phone: z.string().optional(),
   address: z.string().optional(),
   commissionType: z.string().optional(),
@@ -65,6 +68,7 @@ const editSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('E-mail inválido'),
   role: z.enum(['ADMIN', 'MANAGER', 'SELLER']),
+  branchId: z.string(),
   phone: z.string().optional(),
   address: z.string().optional(),
   commissionType: z.string().optional(),
@@ -83,6 +87,7 @@ function emptyCreate(): CreateValues {
     email: '',
     password: '',
     role: 'SELLER',
+    branchId: '',
     phone: '',
     address: '',
     commissionType: 'SALE_PERCENTAGE',
@@ -148,6 +153,7 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
         email: values.email.trim(),
         password: values.password,
         role: values.role,
+        branchId: branchIdToPayload(values.branchId),
         phone: values.phone?.trim() || undefined,
         address: values.address?.trim() || undefined,
       };
@@ -197,6 +203,7 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
         name: values.name.trim(),
         email: values.email.trim(),
         role: values.role,
+        branchId: branchIdToPayload(values.branchId),
         phone: values.phone?.trim() || undefined,
         address: values.address?.trim() || undefined,
       };
@@ -262,6 +269,7 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
       name: u.name ?? '',
       email: u.email ?? '',
       role: (u.role as any) ?? 'SELLER',
+      branchId: u.branchId ?? '',
       phone: u.phone ?? '',
       address: u.address ?? '',
       commissionType: 'SALE_PERCENTAGE',
@@ -358,6 +366,14 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
                   />
                 )}
 
+                <BranchAssignmentField
+                  value={watchCreate('branchId') ?? ''}
+                  onChange={(v) =>
+                    setValueCreate('branchId', v, { shouldValidate: true, shouldDirty: true })
+                  }
+                  error={createErrors.branchId?.message}
+                />
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField label="Telefone" error={createErrors.phone?.message}>
                     <Input {...registerCreate('phone')} placeholder="Opcional" />
@@ -449,6 +465,9 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
                     Perfil
                   </TableHead>
                   <TableHead className="h-12 px-4 text-xs font-medium text-muted-foreground">
+                    Loja
+                  </TableHead>
+                  <TableHead className="h-12 px-4 text-xs font-medium text-muted-foreground">
                     Status
                   </TableHead>
                   <TableHead className="h-12 px-4 text-right text-xs font-medium text-muted-foreground">
@@ -459,7 +478,7 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
               <TableBody>
                 {usersQuery.isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
                       Carregando usuários…
                     </TableCell>
                   </TableRow>
@@ -472,6 +491,9 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
                       </TableCell>
                       <TableCell className="px-4 py-4">
                         <RoleBadge role={u.role} />
+                      </TableCell>
+                      <TableCell className="px-4 py-4 text-sm text-muted-foreground">
+                        {userBranchLabel(u)}
                       </TableCell>
                       <TableCell className="px-4 py-4">
                         <StatusBadge active={u.active} />
@@ -517,7 +539,7 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -538,6 +560,9 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">{u.name}</p>
                         <p className="truncate text-sm text-muted-foreground">{u.email}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Loja: {userBranchLabel(u)}
+                        </p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <RoleBadge role={u.role} />
                           <StatusBadge active={u.active} />
@@ -609,6 +634,22 @@ export function UsersManagement({ sellerOnly = false }: { sellerOnly?: boolean }
                 error={editErrors.role?.message}
               />
             )}
+
+            <BranchAssignmentField
+              value={watchEdit('branchId') ?? ''}
+              onChange={(v) =>
+                setValueEdit('branchId', v, { shouldValidate: true, shouldDirty: true })
+              }
+              error={editErrors.branchId?.message}
+              currentBranch={
+                selectedUser?.branchId
+                  ? {
+                      id: selectedUser.branchId,
+                      name: selectedUser.branchName ?? 'Filial',
+                    }
+                  : null
+              }
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Telefone" error={editErrors.phone?.message}>

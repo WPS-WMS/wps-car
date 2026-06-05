@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "deploy:qa": "npm run deploy:qa --prefix ../..",
     "start": "next start",
     "lint": "next lint"
   },

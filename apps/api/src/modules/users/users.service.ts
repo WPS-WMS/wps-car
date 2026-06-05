@@ -55,6 +55,7 @@ export class UsersService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
+    const branchId = await this.resolveBranchId(dto.branchId);
 
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
@@ -66,11 +67,15 @@ export class UsersService {
           role: dto.role,
           phone: dto.phone?.trim() || null,
           address: dto.address?.trim() || null,
+          branchId,
           active: true,
           createdById: actor.id,
           updatedById: actor.id,
         },
-        include: { rolePermissions: { include: { permission: true } } },
+        include: {
+          branch: { select: { id: true, name: true } },
+          rolePermissions: { include: { permission: true } },
+        },
       });
 
       if (dto.role === UserRole.SELLER && dto.commissionType) {
@@ -129,12 +134,18 @@ export class UsersService {
 
     const isActivating = dto.active === true && user.active === false;
 
+    let branchId: string | null | undefined;
+    if (dto.branchId !== undefined) {
+      branchId = await this.resolveBranchId(dto.branchId);
+    }
+
     const updated = await this.usersRepository.update(id, {
       name: dto.name,
       email: dto.email?.toLowerCase(),
       phone: dto.phone?.trim(),
       address: dto.address?.trim(),
       role: dto.role,
+      ...(branchId !== undefined && { branchId }),
       active: dto.active,
       ...(isActivating
         ? { deactivationReason: null, deactivatedAt: null }
@@ -259,6 +270,27 @@ export class UsersService {
     await this.usersRepository.update(id, { updatedById: actor.id });
 
     return toUserResponse(updated);
+  }
+
+  private async resolveBranchId(branchId?: string | null): Promise<string | null> {
+    if (!branchId) {
+      return null;
+    }
+
+    const tenantId = this.tenantContext.requireTenantId();
+    const branch = await this.prisma.tenantBranch.findFirst({
+      where: { id: branchId, tenantId },
+    });
+
+    if (!branch) {
+      throw new DomainException(
+        'BRANCH_NOT_FOUND',
+        'Filial não encontrada ou não pertence à empresa',
+        400,
+      );
+    }
+
+    return branch.id;
   }
 
   private assertTenantRole(role: UserRole) {

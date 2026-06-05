@@ -373,6 +373,8 @@ export interface TenantUser {
   role: string;
   phone?: string | null;
   address?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
   active?: boolean;
   deactivatedAt?: string | null;
   deactivationReason?: string | null;

@@ -251,8 +251,10 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   createdById  String?   @map("created_by_id")
   updatedById  String?   @map("updated_by_id")
+  branchId     String?   @map("branch_id") // null = matriz (tenant)
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch TenantBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   createdBy User?  @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy User?  @relation("UserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
@@ -808,6 +810,7 @@ model TenantBranch {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users  User[]
 
   @@index([tenantId])
   @@map("tenant_branches")

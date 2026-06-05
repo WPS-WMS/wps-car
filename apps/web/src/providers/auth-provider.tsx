@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
   clearAuthSession,
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,18 +49,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string, tenantCnpj?: string) => {
+      queryClient.clear();
       const data = await api.login({ email, password, tenantCnpj });
       setUser(data.user);
       router.push('/dashboard');
     },
-    [router],
+    [queryClient, router],
   );
 
   const logout = useCallback(async () => {
     await api.logout();
+    queryClient.clear();
     setUser(null);
     router.push('/login');
-  }, [router]);
+  }, [queryClient, router]);
 
   const value = useMemo(
     () => ({

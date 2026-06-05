@@ -7,9 +7,11 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { CommissionRuleType, UserRole } from '@prisma/client';
 
@@ -41,6 +43,12 @@ export class CreateUserDto {
     message: `Perfil deve ser um de: ${ALLOWED_ROLES.join(', ')}`,
   })
   role!: (typeof ALLOWED_ROLES)[number];
+
+  /** Filial do usuário; omitir ou null = matriz (tenant) */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined && value !== '')
+  @IsUUID('4', { message: 'Filial inválida' })
+  branchId?: string | null;
 
   // Comissão padrão do vendedor (apenas para role SELLER)
   @IsOptional()

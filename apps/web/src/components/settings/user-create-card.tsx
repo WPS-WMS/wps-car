@@ -22,7 +22,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { BranchAssignmentField } from '@/components/users/branch-assignment-field';
 import { FormField, FormNativeSelect, FormTextarea } from '@/components/vehicles/form-field';
+import { branchIdToPayload, userBranchLabel } from '@/hooks/use-tenant-branch-options';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -45,6 +47,7 @@ const schema = z.object({
   email: z.string().email('E-mail inválido'),
   password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
   role: z.enum(['ADMIN', 'MANAGER', 'SELLER']),
+  branchId: z.string(),
   phone: z.string().optional(),
   address: z.string().optional(),
   commissionType: z.string().optional(),
@@ -57,6 +60,7 @@ const editSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('E-mail inválido'),
   role: z.enum(['ADMIN', 'MANAGER', 'SELLER']),
+  branchId: z.string(),
   phone: z.string().optional(),
   address: z.string().optional(),
   commissionType: z.string().optional(),
@@ -77,6 +81,7 @@ function empty(): Values {
     email: '',
     password: '',
     role: 'SELLER',
+    branchId: '',
     phone: '',
     address: '',
     commissionType: 'SALE_PERCENTAGE',
@@ -142,6 +147,7 @@ export function UserCreateCard({
         email: values.email.trim(),
         password: values.password,
         role: values.role,
+        branchId: branchIdToPayload(values.branchId),
         phone: values.phone?.trim() || undefined,
         address: values.address?.trim() || undefined,
       };
@@ -205,6 +211,7 @@ export function UserCreateCard({
         name: values.name.trim(),
         email: values.email.trim(),
         role: values.role,
+        branchId: branchIdToPayload(values.branchId),
         phone: values.phone?.trim() || undefined,
         address: values.address?.trim() || undefined,
       };
@@ -283,6 +290,7 @@ export function UserCreateCard({
       name: u.name ?? '',
       email: u.email ?? '',
       role: (u.role as any) ?? 'SELLER',
+      branchId: u.branchId ?? '',
       phone: u.phone ?? '',
       address: u.address ?? '',
       commissionType: 'SALE_PERCENTAGE',
@@ -386,6 +394,14 @@ export function UserCreateCard({
                       error={errors.role?.message}
                     />
 
+                    <BranchAssignmentField
+                      value={watch('branchId') ?? ''}
+                      onChange={(v) =>
+                        setValue('branchId', v, { shouldValidate: true, shouldDirty: true })
+                      }
+                      error={errors.branchId?.message}
+                    />
+
                     <div className="grid gap-4 sm:grid-cols-2">
                       <FormField label="Telefone" error={errors.phone?.message}>
                         <Input {...register('phone')} placeholder="Opcional" />
@@ -487,6 +503,7 @@ export function UserCreateCard({
                     <TableHead>Nome</TableHead>
                     <TableHead>E-mail</TableHead>
                     <TableHead>Perfil</TableHead>
+                    <TableHead>Loja</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-40" />
                   </TableRow>
@@ -500,6 +517,9 @@ export function UserCreateCard({
                         <Badge variant={u.role === 'ADMIN' ? 'success' : 'secondary'}>
                           {roleLabel(u.role)}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {userBranchLabel(u)}
                       </TableCell>
                       <TableCell className="text-sm">
                         <Badge variant={u.active === false ? 'destructive' : 'secondary'}>
@@ -545,7 +565,7 @@ export function UserCreateCard({
                   ))}
                   {!users.length ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                         Nenhum usuário encontrado
                       </TableCell>
                     </TableRow>
@@ -593,6 +613,22 @@ export function UserCreateCard({
               onChange={(v) => setValueEdit('role', v as any, { shouldValidate: true })}
               options={roles as unknown as { value: string; label: string }[]}
               error={editErrors.role?.message}
+            />
+
+            <BranchAssignmentField
+              value={watchEdit('branchId') ?? ''}
+              onChange={(v) =>
+                setValueEdit('branchId', v, { shouldValidate: true, shouldDirty: true })
+              }
+              error={editErrors.branchId?.message}
+              currentBranch={
+                selectedUser?.branchId
+                  ? {
+                      id: selectedUser.branchId,
+                      name: selectedUser.branchName ?? 'Filial',
+                    }
+                  : null
+              }
             />
 
             <div className="grid gap-4 sm:grid-cols-2">

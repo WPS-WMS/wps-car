@@ -91,6 +91,14 @@ Passo a passo completo: [docs/DEPLOY-QA.md](docs/DEPLOY-QA.md)
 
 Arquivos na raiz: `render.yaml`, `firebase.json`, `.firebaserc.example`.
 
+Deploy do frontend QA:
+
+```powershell
+npm run deploy:qa
+```
+
+(Requer `apps/web/.env.production.local` com `NEXT_PUBLIC_API_URL` do Render.)
+
 ## Próximo passo
 
 Evoluções opcionais: mais tipos de relatório, filtros avançados, agendamento por e-mail.

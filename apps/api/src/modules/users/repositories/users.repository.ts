@@ -38,6 +38,7 @@ export class UsersRepository extends TenantScopedRepository {
         take: limit,
         orderBy: orderBy ?? { createdAt: 'desc' },
         include: {
+          branch: { select: { id: true, name: true } },
           rolePermissions: { include: { permission: true } },
         },
       }),
@@ -51,6 +52,7 @@ export class UsersRepository extends TenantScopedRepository {
     return this.prisma.user.findFirst({
       where: { id, tenantId: this.tenantContext.requireTenantId() },
       include: {
+        branch: { select: { id: true, name: true } },
         rolePermissions: { include: { permission: true } },
       },
     });
@@ -69,6 +71,7 @@ export class UsersRepository extends TenantScopedRepository {
     return this.prisma.user.create({
       data,
       include: {
+        branch: { select: { id: true, name: true } },
         rolePermissions: { include: { permission: true } },
       },
     });
@@ -79,6 +82,7 @@ export class UsersRepository extends TenantScopedRepository {
       where: { id },
       data,
       include: {
+        branch: { select: { id: true, name: true } },
         rolePermissions: { include: { permission: true } },
       },
     });
@@ -111,6 +115,7 @@ export class UsersRepository extends TenantScopedRepository {
       return tx.user.findUniqueOrThrow({
         where: { id: userId },
         include: {
+          branch: { select: { id: true, name: true } },
           rolePermissions: { include: { permission: true } },
         },
       });

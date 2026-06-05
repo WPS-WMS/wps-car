@@ -46,14 +46,18 @@ export function StoreManagement() {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
 
+  const tenantId = user?.tenantId ?? null;
+
   const tenantQuery = useQuery({
-    queryKey: ['tenant-me'],
+    queryKey: ['tenant-me', tenantId],
     queryFn: () => api.getCurrentTenant(),
+    enabled: !!tenantId,
   });
 
   const branchesQuery = useQuery({
-    queryKey: ['tenant-branches', { activeOnly }],
+    queryKey: ['tenant-branches', tenantId, { activeOnly }],
     queryFn: () => api.getTenantBranches(activeOnly),
+    enabled: !!tenantId,
   });
 
   const create = useMutation({
