@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Mail, Phone, MapPin, Truck } from 'lucide-react';
 import { api } from '@/lib/api';
+import { supplierEditHref } from '@/lib/edit-routes';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
 import { supplierCategoryLabels } from '@/lib/person-labels';
@@ -95,7 +96,7 @@ export default function FornecedoresPage() {
                     <div className="min-w-0 flex-1">
                       {canUpdate ? (
                         <Link
-                          href={`/fornecedores/${s.id}/editar`}
+                          href={supplierEditHref(s.id)}
                           className="font-semibold text-foreground hover:text-brand-600"
                         >
                           {s.name}

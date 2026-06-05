@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { vehicleEditHref } from '@/lib/edit-routes';
 import { mediaUrl } from '@/lib/media';
 import { formatCurrency } from '@/lib/format';
 import { vehicleStatusLabels, vehicleStatusVariant } from '@/lib/labels';
@@ -41,7 +42,7 @@ export function VehicleListCard({ item }: { item: StockItem }) {
           {formatCurrency(item.listedValue ?? item.purchaseValue)}
         </p>
         <Link
-          href={`/veiculos/${item.id}/editar`}
+          href={vehicleEditHref(item.id)}
           className="text-xs font-medium text-brand-600 hover:underline"
         >
           Ver detalhes

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { vehicleEditHref } from '@/lib/edit-routes';
 import { assetTypeLabelCapitalized, isProductType } from '@/lib/asset-type';
 import {
   fuelTypeLabels,
@@ -177,7 +178,7 @@ export function VehicleForm({
         toast.success(
           `${assetTypeLabelCapitalized(values.type)} cadastrado${photoMsg} com sucesso`,
         );
-        router.push(`/veiculos/${created.id}/editar`);
+        router.push(vehicleEditHref(created.id));
       } else if (vehicleId) {
         await api.updateVehicle(vehicleId, payload);
         toast.success(`${assetTypeLabelCapitalized(values.type)} atualizado`);

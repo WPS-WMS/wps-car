@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { MoreVertical, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
+import { customerEditHref } from '@/lib/edit-routes';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
 import { formatAddress, personTypeLabels } from '@/lib/person-labels';
@@ -99,7 +100,7 @@ export default function ClientesPage() {
                     <TableCell className="font-medium text-foreground">
                       {canUpdate ? (
                         <Link
-                          href={`/clientes/${c.id}/editar`}
+                          href={customerEditHref(c.id)}
                           className="hover:text-brand-600 hover:underline"
                         >
                           {c.name}
@@ -130,7 +131,7 @@ export default function ClientesPage() {
                     {canUpdate ? (
                       <TableCell>
                         <Link
-                          href={`/clientes/${c.id}/editar`}
+                          href={customerEditHref(c.id)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
                           title="Editar cliente"
                         >

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { supplierEditHref } from '@/lib/edit-routes';
 import { personTypeLabels, supplierCategoryLabels } from '@/lib/person-labels';
 import {
   emptySupplierForm,
@@ -103,7 +104,7 @@ export function SupplierForm({
       if (mode === 'create') {
         const created = await api.createSupplier(payload);
         toast.success('Fornecedor cadastrado');
-        router.push(`/fornecedores/${created.id}/editar`);
+        router.push(supplierEditHref(created.id));
       } else if (supplierId) {
         await api.updateSupplier(supplierId, payload);
         toast.success('Fornecedor atualizado');

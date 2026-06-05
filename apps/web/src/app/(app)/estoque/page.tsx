@@ -9,6 +9,7 @@ import { Search, Plus, Pencil } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
 import { api } from '@/lib/api';
+import { vehicleEditHref } from '@/lib/edit-routes';
 import { formatCurrency } from '@/lib/format';
 import { mediaUrl } from '@/lib/media';
 import { vehicleStatusLabels, vehicleStatusVariant } from '@/lib/labels';
@@ -123,7 +124,7 @@ export default function EstoquePage() {
             <TableBody>
               {items.map((item) => {
                 const src = mediaUrl(item.photo?.url);
-                const editHref = `/veiculos/${item.id}/editar`;
+                const editHref = vehicleEditHref(item.id);
                 return (
                   <TableRow
                     key={item.id}

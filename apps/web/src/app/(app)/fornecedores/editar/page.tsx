@@ -1,7 +1,8 @@
 'use client';
 
-import { use } from 'react';
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -12,8 +13,8 @@ import { SupplierForm } from '@/components/cadastro/supplier-form';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export default function EditarFornecedorPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+function EditarFornecedorContent() {
+  const id = useSearchParams().get('id') ?? '';
   const { user } = useAuth();
   const canRead = hasPermission(user, 'suppliers:read');
   const canUpdate = hasPermission(user, 'suppliers:update');
@@ -23,6 +24,10 @@ export default function EditarFornecedorPage({ params }: { params: Promise<{ id:
     queryFn: () => api.getSupplier(id),
     enabled: !!id && canRead,
   });
+
+  if (!id) {
+    return <p className="text-sm text-destructive">ID do fornecedor não informado.</p>;
+  }
 
   if (!canRead) {
     return <p className="text-sm text-brand-600">Sem permissão para visualizar fornecedores.</p>;
@@ -46,12 +51,15 @@ export default function EditarFornecedorPage({ params }: { params: Promise<{ id:
           Voltar
         </Link>
       </PageHeader>
-      <SupplierForm
-        mode="edit"
-        supplierId={id}
-        initialData={s}
-        canUpdate={canUpdate}
-      />
+      <SupplierForm mode="edit" supplierId={id} initialData={s} canUpdate={canUpdate} />
     </div>
+  );
+}
+
+export default function EditarFornecedorPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-brand-600">Carregando…</p>}>
+      <EditarFornecedorContent />
+    </Suspense>
   );
 }

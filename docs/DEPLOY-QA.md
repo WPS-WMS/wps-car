@@ -53,7 +53,7 @@ O Render também roda `prisma migrate deploy` no `startCommand` a cada deploy.
 | Campo | Valor |
 |-------|--------|
 | Root Directory | `apps/api` |
-| Build Command | `npm ci && npx prisma generate && npm run build` |
+| Build Command | `npm ci --include=dev && npx prisma generate && npm run build` |
 | Start Command | `npx prisma migrate deploy && npm run start:prod` |
 | Health Check Path | `/api/v1/health` |
 
@@ -90,11 +90,11 @@ Health: `https://wps-car-api-qa.onrender.com/api/v1/health`
 
 ## 3. Firebase — frontend QA
 
-O projeto usa **Firebase Hosting com suporte a frameworks** (Next.js 15).
+O frontend é exportado como **site estático** (`output: 'export'`) — funciona no plano **Spark (grátis)**, sem Cloud Functions nem Blaze.
 
 ### Pré-requisitos
 
-- Node.js 20+
+- Node.js 20+ (22 recomendado)
 - [Firebase CLI](https://firebase.google.com/docs/cli): `npm install -g firebase-tools`
 - Login: `firebase login`
 
@@ -135,8 +135,20 @@ firebase hosting:secrets:set NEXT_PUBLIC_API_URL
 
 ### Deploy
 
+O `firebase.json` roda o build automaticamente (`predeploy`) e publica `apps/web/out`.
+
 ```powershell
-# Raiz do repo
+# Na raiz do repo — confira apps/web/.env.production.local antes
+firebase use qa
+firebase deploy --only hosting
+```
+
+Build manual (opcional):
+
+```powershell
+cd apps/web
+npm run build
+cd ../..
 firebase deploy --only hosting
 ```
 
@@ -144,6 +156,14 @@ URLs típicas:
 
 - `https://SEU-PROJECT-ID.web.app`
 - `https://SEU-PROJECT-ID.firebaseapp.com`
+
+### Rotas de edição
+
+Telas de edição usam query string (compatível com export estático):
+
+- `/veiculos/editar?id=UUID`
+- `/clientes/editar?id=UUID`
+- `/fornecedores/editar?id=UUID`
 
 ### Atualizar CORS no Render
 
@@ -202,6 +222,8 @@ Exemplo de ordem em release:
 
 | Sintoma | Causa provável | Ação |
 |---------|----------------|------|
+| `nest: not found` no build | `NODE_ENV=production` omite devDependencies | Build: `npm ci --include=dev && ...` |
+| `Failed to list functions` | Deploy antigo com SSR/frameworks | Usar `firebase.json` estático atual (`public: apps/web/out`) |
 | CORS blocked | `CORS_ORIGIN` sem URL do Firebase | Adicionar `.web.app` e `.firebaseapp.com` |
 | 502 / timeout API | Render free dormindo | Aguardar ou upgrade de plano |
 | Prisma P1001 | `DATABASE_URL` errada / Neon pausado | Verificar URL pooled + SSL |

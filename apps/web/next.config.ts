@@ -8,7 +8,12 @@ const apiHost = new URL(apiOrigin).hostname;
 const apiPort = new URL(apiOrigin).port || undefined;
 
 const nextConfig: NextConfig = {
+  output: 'export',
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'http',

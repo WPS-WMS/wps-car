@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, MoreVertical, SlidersHorizontal } from 'lucide-react';
 import { api } from '@/lib/api';
+import { vehicleEditHref } from '@/lib/edit-routes';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
 import {
@@ -140,7 +141,7 @@ export default function VeiculosPage() {
                     <TableCell className="font-medium text-foreground">
                       {canUpdate ? (
                         <Link
-                          href={`/veiculos/${v.id}/editar`}
+                          href={vehicleEditHref(v.id)}
                           className="hover:text-brand-600 hover:underline"
                         >
                           {v.brand} {v.model}
@@ -167,7 +168,7 @@ export default function VeiculosPage() {
                     {canUpdate ? (
                       <TableCell>
                         <Link
-                          href={`/veiculos/${v.id}/editar`}
+                          href={vehicleEditHref(v.id)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
                           title="Editar"
                         >

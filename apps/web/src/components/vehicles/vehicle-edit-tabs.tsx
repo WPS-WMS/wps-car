@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Car, Coins, Receipt } from 'lucide-react';
 import type { Vehicle } from '@/types/api';
+import { vehicleEditHref } from '@/lib/edit-routes';
 import { hasPermission } from '@/lib/permissions';
 import { useAuth } from '@/providers/auth-provider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,16 +48,12 @@ export function VehicleEditTabs({
 
   const setTab = useCallback(
     (tab: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (tab === 'dados') {
-        params.delete('tab');
-      } else {
-        params.set('tab', tab);
-      }
-      const qs = params.toString();
-      router.replace(`/veiculos/${vehicleId}/editar${qs ? `?${qs}` : ''}`, { scroll: false });
+      const tabParam = tab === 'dados' ? undefined : tab;
+      router.replace(vehicleEditHref(vehicleId, tabParam ? { tab: tabParam } : undefined), {
+        scroll: false,
+      });
     },
-    [router, searchParams, vehicleId],
+    [router, vehicleId],
   );
 
   return (

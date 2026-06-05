@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { customerEditHref } from '@/lib/edit-routes';
 import {
   customerTypeLabels,
   personTypeLabels,
@@ -118,7 +119,7 @@ export function CustomerForm({
       if (mode === 'create') {
         const created = await api.createCustomer(payload);
         toast.success('Cliente cadastrado');
-        router.push(`/clientes/${created.id}/editar`);
+        router.push(customerEditHref(created.id));
       } else if (customerId) {
         await api.updateCustomer(customerId, payload);
         toast.success('Cliente atualizado');

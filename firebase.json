@@ -1,9 +1,8 @@
 {
   "hosting": {
-    "source": "apps/web",
+    "public": "apps/web/out",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "frameworksBackend": {
-      "region": "us-central1"
-    }
+    "cleanUrls": true,
+    "predeploy": ["npm run build --prefix apps/web"]
   }
 }

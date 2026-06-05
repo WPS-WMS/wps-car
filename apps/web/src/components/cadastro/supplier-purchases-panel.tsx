@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { vehicleEditHref } from '@/lib/edit-routes';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { vehicleStatusLabels, vehicleStatusVariant } from '@/lib/labels';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +55,7 @@ export function SupplierPurchasesPanel({ supplierId }: { supplierId: string }) {
                   <TableCell>{formatDate(row.purchaseDate)}</TableCell>
                   <TableCell>
                     <Link
-                      href={`/veiculos/${row.vehicleId}/editar`}
+                      href={vehicleEditHref(row.vehicleId)}
                       className="font-medium hover:underline"
                     >
                       {row.brand} {row.model}
