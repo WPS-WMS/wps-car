@@ -1,0 +1,37 @@
+# Blueprint Render — ambiente QA (API NestJS)
+# https://render.com/docs/blueprint-spec
+#
+# Após criar o Web Service, defina DATABASE_URL (Neon) e secrets JWT no painel.
+# CORS_ORIGIN = URL(s) do Firebase Hosting, separadas por vírgula.
+
+services:
+  - type: web
+    name: wps-car-api-qa
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: apps/api
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm run start:prod
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: api/v1
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: MAX_FILE_SIZE_MB
+        value: "10"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false

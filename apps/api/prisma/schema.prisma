@@ -1,0 +1,873 @@
+// =============================================================================
+// WPS Car — Modelagem inicial (SaaS multi-tenant para revendas de veículos)
+// Fase 1: apenas schema. NestJS, services e frontend virão nos próximos módulos.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Enums — Tenant & Auth
+// -----------------------------------------------------------------------------
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  TRIAL
+}
+
+enum SubscriptionPlan {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum UserRole {
+  MODERATOR // plataforma (tenantId nulo)
+  ADMIN
+  MANAGER
+  SELLER
+}
+
+// -----------------------------------------------------------------------------
+// Enums — Veículos & Estoque
+// -----------------------------------------------------------------------------
+
+enum VehicleType {
+  CAR
+  MOTORCYCLE
+  TRUCK
+  UTILITY
+  PRODUCT // Produto (acessório, peça, bem não veicular)
+  OTHER
+}
+
+enum VehicleStatus {
+  IN_STOCK // Em estoque
+  RESERVED // Reservado
+  SOLD // Vendido
+  IN_PREPARATION // Em preparação
+  IN_MAINTENANCE // Em manutenção
+  UNAVAILABLE // Indisponível
+}
+
+enum FuelType {
+  GASOLINE
+  ETHANOL
+  FLEX
+  DIESEL
+  ELECTRIC
+  HYBRID
+  GNV
+  OTHER
+}
+
+enum TransmissionType {
+  MANUAL
+  AUTOMATIC
+  CVT
+  AUTOMATED_MANUAL
+  OTHER
+}
+
+enum VehicleCategory {
+  HATCH
+  SEDAN
+  SUV
+  PICKUP
+  VAN
+  COUPE
+  WAGON
+  OTHER
+}
+
+enum StockMovementType {
+  ENTRY // Entrada
+  EXIT // Saída
+  ADJUSTMENT // Ajuste
+  RESERVATION // Reserva
+  RELEASE // Liberação de reserva
+}
+
+// -----------------------------------------------------------------------------
+// Enums — Pessoas (Cliente / Fornecedor)
+// -----------------------------------------------------------------------------
+
+enum PersonType {
+  INDIVIDUAL // Pessoa física
+  COMPANY // Pessoa jurídica
+}
+
+enum SupplierCategory {
+  INDIVIDUAL
+  COMPANY
+  AUCTION // Leilão
+  DEALERSHIP // Revenda
+  INSURANCE // Seguradora
+  BANK // Banco
+  PRIVATE // Particular
+}
+
+enum CustomerType {
+  BUYER
+  SELLER
+  BOTH
+}
+
+// -----------------------------------------------------------------------------
+// Enums — Financeiro, Custos, Vendas
+// -----------------------------------------------------------------------------
+
+enum VehicleCostType {
+  PAINTING
+  MECHANICS
+  BODYWORK
+  SANITIZATION
+  DOCUMENTATION
+  DISPATCHER
+  TRANSPORT
+  TOWING
+  ADVERTISING
+  COMMISSION
+  WASHING
+  REVISION
+  OTHER
+}
+
+enum SaleStatus {
+  NEGOTIATION // Em negociação
+  SOLD // Vendido
+  CANCELLED // Cancelado
+  AWAITING_PAYMENT // Aguardando pagamento
+  COMPLETED // Finalizado
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  FINANCING
+  CHECK
+  TRADE_IN
+  OTHER
+}
+
+enum CommissionRuleType {
+  SALE_PERCENTAGE // Percentual sobre venda
+  PROFIT_PERCENTAGE // Percentual sobre lucro
+  FIXED_AMOUNT // Valor fixo
+  CUSTOM_PER_VEHICLE // Personalizado por veículo
+}
+
+enum OpportunityStatus {
+  OPEN
+  IN_PROGRESS
+  WON
+  LOST
+  CANCELLED
+}
+
+enum AttachmentEntityType {
+  VEHICLE
+  VEHICLE_COST
+  SALE
+  CUSTOMER
+  SUPPLIER
+}
+
+enum AttachmentStorageProvider {
+  LOCAL
+  S3
+}
+
+// -----------------------------------------------------------------------------
+// Base auditável (campos repetidos via convenção — Prisma não suporta herança)
+// Todas as entidades de negócio do tenant incluem tenantId + auditoria.
+// -----------------------------------------------------------------------------
+
+// =============================================================================
+// TENANT (Empresa)
+// =============================================================================
+
+model Tenant {
+  id        String           @id @default(uuid())
+  name      String
+  cnpj      String           @unique
+  email     String
+  phone     String?
+  status    TenantStatus     @default(TRIAL)
+  plan      SubscriptionPlan @default(STARTER)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  users            User[]
+  vehicles         Vehicle[]
+  customers        Customer[]
+  suppliers        Supplier[]
+  sales            Sale[]
+  opportunities    Opportunity[]
+  commissionRules  CommissionRule[]
+  sellerCommissionRules SellerCommissionRule[]
+  tenantSettings   TenantSetting[]
+  stockMovements   StockMovement[]
+  vehicleCosts     VehicleCost[]
+  refreshTokens    RefreshToken[]
+  configVehicleTypes   ConfigVehicleType[]
+  configCostTypes      ConfigCostType[]
+  configPaymentMethods ConfigPaymentMethod[]
+  configStatuses       ConfigStatus[]
+  configEmailTemplates ConfigEmailTemplate[]
+  branches             TenantBranch[]
+
+  @@map("tenants")
+}
+
+// =============================================================================
+// AUTH — Usuários, tokens, RBAC
+// =============================================================================
+
+model User {
+  id           String    @id @default(uuid())
+  tenantId     String?   @map("tenant_id") // nulo apenas para MODERATOR (plataforma)
+  name         String
+  email        String
+  passwordHash String    @map("password_hash")
+  phone        String?   @map("phone")
+  address      String?   @map("address")
+  role         UserRole
+  active       Boolean   @default(true)
+  deactivatedAt DateTime? @map("deactivated_at")
+  deactivationReason String? @map("deactivation_reason")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  createdById  String?   @map("created_by_id")
+  updatedById  String?   @map("updated_by_id")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdBy User?  @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?  @relation("UserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdUsers User[] @relation("UserCreatedBy")
+  updatedUsers User[] @relation("UserUpdatedBy")
+
+  refreshTokens       RefreshToken[]
+  rolePermissions     UserPermission[] // overrides por usuário (opcional)
+  assignedCustomers   Customer[]       @relation("CustomerAssignedSeller")
+  salesAsSeller       Sale[]           @relation("SaleSeller")
+  opportunities       Opportunity[]
+  stockMovements      StockMovement[]
+  vehicleCostsResponsible VehicleCost[] @relation("VehicleCostResponsible")
+  vehicleCostsCreated     VehicleCost[] @relation("VehicleCostCreatedBy")
+  vehiclesCreated       Vehicle[]          @relation("VehicleCreatedBy")
+  vehiclesUpdated       Vehicle[]          @relation("VehicleUpdatedBy")
+  vehicleFinancialsSold VehicleFinancial[] @relation("VehicleFinancialSeller")
+  commissionRule        SellerCommissionRule?
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tenantId  String?  @map("tenant_id")
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+/// Permissões granulares por módulo (RBAC complementar ao role)
+model Permission {
+  id          String @id @default(uuid())
+  code        String @unique // ex: vehicles:read, sales:create
+  module      String // ex: vehicles, sales, financial
+  description String?
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@index([module])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid())
+  role         UserRole
+  permissionId String   @map("permission_id")
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@map("role_permissions")
+}
+
+/// Override de permissão por usuário (além do perfil)
+model UserPermission {
+  id           String  @id @default(uuid())
+  userId       String  @map("user_id")
+  permissionId String  @map("permission_id")
+  granted      Boolean @default(true)
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@map("user_permissions")
+}
+
+// =============================================================================
+// VEÍCULOS
+// =============================================================================
+
+model Vehicle {
+  id              String           @id @default(uuid())
+  tenantId        String           @map("tenant_id")
+  type            VehicleType
+  brand           String
+  model           String
+  version         String?
+  manufactureYear Int              @map("manufacture_year")
+  modelYear       Int              @map("model_year")
+  licensePlate    String?          @map("license_plate")
+  renavam         String?
+  chassis         String?
+  color           String?
+  mileage         Int?
+  fuel            FuelType?
+  transmission    TransmissionType?
+  doors           Int?
+  category        VehicleCategory?
+  status          VehicleStatus    @default(IN_STOCK)
+  notes           String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  createdById     String?          @map("created_by_id")
+  updatedById     String?          @map("updated_by_id")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("VehicleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?  @relation("VehicleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  photos          VehiclePhoto[]
+  financial       VehicleFinancial?
+  costs           VehicleCost[]
+  stockMovements  StockMovement[]
+  sales           Sale[]
+  opportunities   Opportunity[]
+  commissionOverrides VehicleCommissionOverride[]
+
+  @@unique([tenantId, licensePlate])
+  @@unique([tenantId, chassis])
+  @@index([tenantId, status])
+  @@index([tenantId, brand, model])
+  @@map("vehicles")
+}
+
+model VehiclePhoto {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  vehicleId String   @map("vehicle_id")
+  fileName  String   @map("file_name")
+  filePath  String   @map("file_path")
+  mimeType  String?  @map("mime_type")
+  sizeBytes Int?     @map("size_bytes")
+  sortOrder Int      @default(0) @map("sort_order")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  storage   AttachmentStorageProvider @default(LOCAL)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, vehicleId])
+  @@map("vehicle_photos")
+}
+
+// =============================================================================
+// FINANCEIRO POR VEÍCULO (+ campos calculados persistidos para relatórios)
+// =============================================================================
+
+model VehicleFinancial {
+  id                     String    @id @default(uuid())
+  tenantId               String    @map("tenant_id")
+  vehicleId              String    @unique @map("vehicle_id")
+  purchaseValue         Decimal   @map("purchase_value") @db.Decimal(14, 2)
+  purchaseDate          DateTime? @map("purchase_date")
+  supplierId            String?   @map("supplier_id")
+  fipeValue             Decimal?  @map("fipe_value") @db.Decimal(14, 2)
+  suggestedPurchaseValue Decimal? @map("suggested_purchase_value") @db.Decimal(14, 2)
+  listedValue           Decimal?  @map("listed_value") @db.Decimal(14, 2) // Valor anunciado
+  minimumValue          Decimal?  @map("minimum_value") @db.Decimal(14, 2)
+  saleValue             Decimal?  @map("sale_value") @db.Decimal(14, 2)
+  saleDate              DateTime? @map("sale_date")
+  customerId            String?   @map("customer_id")
+  sellerId              String?   @map("seller_id")
+  // Campos calculados (atualizados por service/domain)
+  totalCosts            Decimal   @default(0) @map("total_costs") @db.Decimal(14, 2)
+  commissionValue       Decimal   @default(0) @map("commission_value") @db.Decimal(14, 2)
+  grossProfit           Decimal?  @map("gross_profit") @db.Decimal(14, 2)
+  marginAmount          Decimal?  @map("margin_amount") @db.Decimal(14, 2)
+  marginPercent         Decimal?  @map("margin_percent") @db.Decimal(8, 4)
+  netResult             Decimal?  @map("net_result") @db.Decimal(14, 2)
+  daysInStock           Int?      @map("days_in_stock")
+  calculatedAt          DateTime? @map("calculated_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  vehicle  Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  seller   User?     @relation("VehicleFinancialSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("vehicle_financials")
+}
+
+// =============================================================================
+// CUSTOS POR VEÍCULO
+// =============================================================================
+
+model VehicleCost {
+  id            String          @id @default(uuid())
+  tenantId      String          @map("tenant_id")
+  vehicleId     String          @map("vehicle_id")
+  type          VehicleCostType
+  description   String
+  amount        Decimal         @db.Decimal(14, 2)
+  costDate      DateTime        @map("cost_date")
+  supplierId    String?         @map("supplier_id")
+  responsibleId String?         @map("responsible_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  createdById   String?         @map("created_by_id")
+  updatedById   String?         @map("updated_by_id")
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  responsible User?     @relation("VehicleCostResponsible", fields: [responsibleId], references: [id], onDelete: SetNull)
+  createdBy   User?     @relation("VehicleCostCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, vehicleId])
+  @@index([tenantId, costDate])
+  @@map("vehicle_costs")
+}
+
+// =============================================================================
+// ESTOQUE — Movimentações
+// =============================================================================
+
+model StockMovement {
+  id          String            @id @default(uuid())
+  tenantId    String            @map("tenant_id")
+  vehicleId   String            @map("vehicle_id")
+  type        StockMovementType
+  description String?
+  reference   String? // NF, contrato, etc.
+  userId      String?           @map("user_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, vehicleId, createdAt])
+  @@map("stock_movements")
+}
+
+// =============================================================================
+// CLIENTES
+// =============================================================================
+
+model Customer {
+  id               String       @id @default(uuid())
+  tenantId         String       @map("tenant_id")
+  name             String
+  document         String // CPF ou CNPJ
+  phone            String?
+  email            String?
+  street           String?
+  number           String?
+  complement       String?
+  neighborhood     String?
+  city             String?
+  state            String?
+  zipCode          String?      @map("zip_code")
+  personType       PersonType   @map("person_type")
+  customerType     CustomerType @default(BUYER) @map("customer_type")
+  notes            String?
+  assignedSellerId String?      @map("assigned_seller_id")
+  active           Boolean      @default(true)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  createdById      String?      @map("created_by_id")
+  updatedById      String?      @map("updated_by_id")
+
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedSeller User?  @relation("CustomerAssignedSeller", fields: [assignedSellerId], references: [id], onDelete: SetNull)
+
+  sales         Sale[]
+  opportunities Opportunity[]
+  financials    VehicleFinancial[]
+  history       CustomerHistory[]
+
+  @@unique([tenantId, document])
+  @@index([tenantId, name])
+  @@map("customers")
+}
+
+model CustomerHistory {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  customerId String   @map("customer_id")
+  action     String // ex: CREATED, UPDATED, SALE, NOTE
+  details    Json?
+  userId     String?  @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, customerId, createdAt])
+  @@map("customer_history")
+}
+
+// =============================================================================
+// FORNECEDORES
+// =============================================================================
+
+model Supplier {
+  id           String           @id @default(uuid())
+  tenantId     String           @map("tenant_id")
+  name         String
+  document     String
+  phone        String?
+  email        String?
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?          @map("zip_code")
+  personType   PersonType       @map("person_type")
+  category     SupplierCategory
+  notes        String?
+  active       Boolean          @default(true)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  createdById  String?          @map("created_by_id")
+  updatedById  String?          @map("updated_by_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  vehicleFinancials VehicleFinancial[]
+  vehicleCosts      VehicleCost[]
+  history           SupplierHistory[]
+
+  @@unique([tenantId, document])
+  @@index([tenantId, name])
+  @@map("suppliers")
+}
+
+model SupplierHistory {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  supplierId String   @map("supplier_id")
+  action     String
+  details    Json?
+  userId     String?  @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, supplierId, createdAt])
+  @@map("supplier_history")
+}
+
+// =============================================================================
+// VENDAS & OPORTUNIDADES
+// =============================================================================
+
+model Sale {
+  id            String        @id @default(uuid())
+  tenantId      String        @map("tenant_id")
+  vehicleId     String        @map("vehicle_id")
+  customerId    String        @map("customer_id")
+  sellerId      String        @map("seller_id")
+  amount        Decimal       @db.Decimal(14, 2)
+  paymentMethod PaymentMethod @map("payment_method")
+  saleDate      DateTime      @map("sale_date")
+  status        SaleStatus    @default(NEGOTIATION)
+  commission    Decimal?      @db.Decimal(14, 2)
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  createdById   String?       @map("created_by_id")
+  updatedById   String?       @map("updated_by_id")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  seller   User     @relation("SaleSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, saleDate])
+  @@index([tenantId, sellerId])
+  @@index([tenantId, status])
+  @@map("sales")
+}
+
+model Opportunity {
+  id          String            @id @default(uuid())
+  tenantId    String            @map("tenant_id")
+  vehicleId   String?           @map("vehicle_id")
+  customerId  String            @map("customer_id")
+  sellerId    String            @map("seller_id")
+  title       String
+  amount      Decimal?          @db.Decimal(14, 2)
+  status      OpportunityStatus @default(OPEN)
+  notes       String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  seller   User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sellerId, status])
+  @@map("opportunities")
+}
+
+// =============================================================================
+// COMISSÕES
+// =============================================================================
+
+model CommissionRule {
+  id        String             @id @default(uuid())
+  tenantId  String             @map("tenant_id")
+  name      String
+  type      CommissionRuleType
+  value     Decimal            @db.Decimal(14, 4) // % ou valor fixo conforme type
+  active    Boolean            @default(true)
+  isDefault Boolean            @default(false) @map("is_default")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, active])
+  @@map("commission_rules")
+}
+
+/// Regra de comissão padrão por vendedor
+model SellerCommissionRule {
+  id        String             @id @default(uuid())
+  tenantId  String             @map("tenant_id")
+  sellerId  String             @unique @map("seller_id")
+  type      CommissionRuleType
+  value     Decimal            @default(0) @db.Decimal(14, 4)
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  seller User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, active])
+  @@map("seller_commission_rules")
+}
+
+/// Override de comissão para um veículo específico
+model VehicleCommissionOverride {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  vehicleId String   @map("vehicle_id")
+  type      CommissionRuleType
+  value     Decimal  @db.Decimal(14, 4)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, vehicleId])
+  @@map("vehicle_commission_overrides")
+}
+
+// =============================================================================
+// CONFIGURAÇÕES DO TENANT
+// =============================================================================
+
+model TenantSetting {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  key       String // ex: default_margin_percent, fipe_margin
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@map("tenant_settings")
+}
+
+model ConfigVehicleType {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  code      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@map("config_vehicle_types")
+}
+
+model ConfigCostType {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  code      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@map("config_cost_types")
+}
+
+model ConfigPaymentMethod {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  code      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@map("config_payment_methods")
+}
+
+model ConfigStatus {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  entity     String // vehicle, sale, etc.
+  name       String
+  code       String
+  color      String?
+  active     Boolean  @default(true)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, entity, code])
+  @@map("config_statuses")
+}
+
+// Filial vinculada ao tenant (matriz)
+model TenantBranch {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  address   String?
+  phone     String?
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_branches")
+}
+
+model ConfigEmailTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  code      String // welcome, sale_completed, etc.
+  subject   String
+  bodyHtml  String   @map("body_html")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@map("config_email_templates")
+}
+
+// =============================================================================
+// ANEXOS (upload local → S3 futuro)
+// =============================================================================
+
+model Attachment {
+  id         String                    @id @default(uuid())
+  tenantId   String                    @map("tenant_id")
+  entityType AttachmentEntityType      @map("entity_type")
+  entityId   String                    @map("entity_id")
+  fileName   String                    @map("file_name")
+  filePath   String                    @map("file_path")
+  mimeType   String?                   @map("mime_type")
+  sizeBytes  Int?                      @map("size_bytes")
+  storage    AttachmentStorageProvider @default(LOCAL)
+  createdAt  DateTime                  @default(now()) @map("created_at")
+
+  // Polimórfico: entityType + entityId (sem FK rígida para flexibilidade)
+
+  @@index([tenantId, entityType, entityId])
+  @@map("attachments")
+}
+
+// =============================================================================
+// COMPRA INTELIGENTE — histórico de consultas FIPE/placa
+// =============================================================================
+
+model PurchaseIntelligenceQuery {
+  id                   String   @id @default(uuid())
+  tenantId             String   @map("tenant_id")
+  licensePlate         String   @map("license_plate")
+  fipeValue            Decimal? @map("fipe_value") @db.Decimal(14, 2)
+  desiredMarginPercent Decimal? @map("desired_margin_percent") @db.Decimal(8, 4)
+  estimatedCosts       Decimal? @map("estimated_costs") @db.Decimal(14, 2)
+  maxPurchaseValue     Decimal? @map("max_purchase_value") @db.Decimal(14, 2)
+  rawResponse          Json?    @map("raw_response")
+  userId               String?  @map("user_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, licensePlate, createdAt])
+  @@map("purchase_intelligence_queries")
+}
