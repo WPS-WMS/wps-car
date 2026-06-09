@@ -3,6 +3,7 @@ import { SaleStatus, UserRole, VehicleStatus } from '@prisma/client';
 import { DomainException } from '../../domain/exceptions/domain.exception';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { toSaleResponse } from '../../common/mappers/sale.mapper';
+import { DataScopeService } from '../../infrastructure/scope/data-scope.service';
 import { TenantContextService } from '../../infrastructure/tenant/tenant-context.service';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { FinancialRepository } from '../financial/repositories/financial.repository';
@@ -24,15 +25,18 @@ export class SalesService {
     private readonly recalculationService: FinancialRecalculationService,
     private readonly tenantContext: TenantContextService,
     private readonly prisma: PrismaService,
+    private readonly dataScope: DataScopeService,
   ) {}
 
   async findAll(query: ListSalesQueryDto, actor: AuthenticatedUser) {
-    const sellerFilter =
-      actor.role === UserRole.SELLER ? { sellerId: actor.id } : undefined;
+    const saleScope = await this.dataScope.buildSaleScope(actor, {
+      branchId: query.branchId,
+      sellerId: query.sellerId,
+    });
 
     const { data, total, page, limit } = await this.salesRepository.findManyPaginated(
       query,
-      sellerFilter,
+      saleScope,
     );
 
     return new PaginatedResponseDto(
@@ -48,7 +52,7 @@ export class SalesService {
     if (!sale) {
       throw new DomainException('SALE_NOT_FOUND', 'Venda não encontrada', 404);
     }
-    this.assertSellerAccess(sale.sellerId, actor);
+    await this.dataScope.assertSaleAccess(sale.sellerId, actor);
     return toSaleResponse(sale);
   }
 
@@ -98,7 +102,7 @@ export class SalesService {
       throw new DomainException('SALE_NOT_FOUND', 'Venda não encontrada', 404);
     }
 
-    this.assertSellerAccess(sale.sellerId, actor);
+    await this.dataScope.assertSaleAccess(sale.sellerId, actor);
 
     if (FINALIZED_STATUSES.includes(sale.status) && dto.status !== SaleStatus.CANCELLED) {
       throw new DomainException(
@@ -161,10 +165,12 @@ export class SalesService {
 
   async getSellerCommissionSummary(
     sellerId: string,
-    startDate?: Date,
-    endDate?: Date,
+    startDate: Date | undefined,
+    endDate: Date | undefined,
+    actor: AuthenticatedUser,
   ) {
     await this.assertSeller(sellerId);
+    await this.dataScope.assertSaleAccess(sellerId, actor);
     const summary = await this.salesRepository.getSellerCommissionSummary(
       sellerId,
       startDate,
@@ -174,14 +180,12 @@ export class SalesService {
   }
 
   async getCommissionReport(actor: AuthenticatedUser, query: CommissionReportQueryDto) {
-    const sellerFilter =
-      actor.role === UserRole.SELLER ? actor.id : undefined;
+    const saleScope = await this.dataScope.buildSaleScope(actor, {
+      branchId: query.branchId,
+      sellerId: query.sellerId,
+    });
 
-    // Se vendedor, ignora sellerId do query (só vê o próprio)
-    const rows = await this.salesRepository.getCommissionReport(
-      { ...query, ...(sellerFilter ? { sellerId: undefined } : {}) },
-      sellerFilter,
-    );
+    const rows = await this.salesRepository.getCommissionReport(query, saleScope);
 
     const normalized = rows.map((s) => {
       const amount = Number((s.amount as any)?.toString?.() ?? s.amount ?? 0);
@@ -311,12 +315,6 @@ export class SalesService {
       throw new DomainException('SELLER_REQUIRED', 'Vendedor é obrigatório', 400);
     }
     return sellerId;
-  }
-
-  private assertSellerAccess(saleSellerId: string, actor: AuthenticatedUser) {
-    if (actor.role === UserRole.SELLER && saleSellerId !== actor.id) {
-      throw new DomainException('SALE_ACCESS_DENIED', 'Venda de outro vendedor', 403);
-    }
   }
 
   private async assertVehicleAvailable(vehicleId: string) {

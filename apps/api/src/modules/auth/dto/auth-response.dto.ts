@@ -6,6 +6,7 @@ export class AuthUserResponseDto {
   email!: string;
   role!: UserRole;
   tenantId!: string | null;
+  branchId!: string | null;
   permissions!: string[];
 }
 

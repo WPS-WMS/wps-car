@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { DataScopeService } from '../../infrastructure/scope/data-scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { ExportReportQueryDto, ReportFormat } from './dto/export-report-query.dto';
 import { GeneralReportQueryDto } from './dto/general-report-query.dto';
@@ -14,10 +14,15 @@ export class ReportsService {
     private readonly repository: ReportsRepository,
     private readonly excelBuilder: ExcelReportBuilder,
     private readonly pdfBuilder: PdfReportBuilder,
+    private readonly dataScope: DataScopeService,
   ) {}
 
-  async getGeneralReport(query: GeneralReportQueryDto) {
-    return this.repository.getGeneralReport(query);
+  async getGeneralReport(actor: AuthenticatedUser, query: GeneralReportQueryDto) {
+    const saleScope = await this.dataScope.buildSaleScope(actor, {
+      branchId: query.branchId,
+      sellerId: query.sellerId,
+    });
+    return this.repository.getGeneralReport(query, saleScope);
   }
 
   async exportStock(query: ExportReportQueryDto): Promise<ReportFile> {
@@ -48,8 +53,11 @@ export class ReportsService {
     actor: AuthenticatedUser,
   ): Promise<ReportFile> {
     const tenantName = await this.repository.getTenantName();
-    const sellerId = actor.role === UserRole.SELLER ? actor.id : undefined;
-    const rows = await this.repository.getSalesRows(query, sellerId);
+    const saleScope = await this.dataScope.buildSaleScope(actor, {
+      branchId: query.branchId,
+      sellerId: query.sellerId,
+    });
+    const rows = await this.repository.getSalesRows(query, saleScope);
     const periodLabel = this.periodLabel(query.startDate, query.endDate);
     const stamp = this.fileStamp();
 
@@ -71,9 +79,20 @@ export class ReportsService {
     };
   }
 
-  async exportSummary(query: ExportReportQueryDto): Promise<ReportFile> {
+  async exportSummary(
+    actor: AuthenticatedUser,
+    query: ExportReportQueryDto,
+  ): Promise<ReportFile> {
     const tenantName = await this.repository.getTenantName();
-    const data = await this.repository.getSummaryData(query.startDate, query.endDate);
+    const saleScope = await this.dataScope.buildSaleScope(actor, {
+      branchId: query.branchId,
+      sellerId: query.sellerId,
+    });
+    const data = await this.repository.getSummaryData(
+      query.startDate,
+      query.endDate,
+      saleScope,
+    );
     const stamp = this.fileStamp();
 
     if (query.format === ReportFormat.XLSX) {

@@ -6,6 +6,7 @@ export interface AuthenticatedUser {
   name: string;
   role: UserRole;
   tenantId: string | null;
+  branchId: string | null;
   permissions: string[];
 }
 

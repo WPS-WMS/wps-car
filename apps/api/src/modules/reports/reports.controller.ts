@@ -16,12 +16,16 @@ export class ReportsController {
   @Get('general')
   @Permissions('reports:read')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  getGeneralReport(@Query() query: GeneralReportQueryDto) {
-    return this.reportsService.getGeneralReport(query);
+  getGeneralReport(
+    @Query() query: GeneralReportQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.reportsService.getGeneralReport(actor, query);
   }
 
   @Get('stock/export')
   @Permissions('reports:read')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async exportStock(
     @Query() query: ExportReportQueryDto,
     @Res() res: Response,
@@ -46,9 +50,10 @@ export class ReportsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async exportSummary(
     @Query() query: ExportReportQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
     @Res() res: Response,
   ) {
-    const file = await this.reportsService.exportSummary(query);
+    const file = await this.reportsService.exportSummary(actor, query);
     this.sendFile(res, file.buffer, file.filename, file.mimeType);
   }
 

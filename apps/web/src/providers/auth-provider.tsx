@@ -24,6 +24,7 @@ interface AuthContextValue {
   login: (email: string, password: string, tenantCnpj?: string) => Promise<void>;
   logout: () => Promise<void>;
   isManager: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       isManager: user?.role === 'ADMIN' || user?.role === 'MANAGER',
+      isAdmin: user?.role === 'ADMIN',
     }),
     [user, isLoading, login, logout],
   );

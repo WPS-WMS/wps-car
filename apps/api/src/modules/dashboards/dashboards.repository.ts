@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SaleStatus, VehicleStatus } from '@prisma/client';
+import { Prisma, SaleStatus, VehicleStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { TenantContextService } from '../../infrastructure/tenant/tenant-context.service';
 
@@ -98,13 +98,18 @@ export class DashboardsRepository {
     };
   }
 
-  async getSalesMetrics(startDate?: Date, endDate?: Date) {
+  async getSalesMetrics(
+    startDate?: Date,
+    endDate?: Date,
+    saleScope: Prisma.SaleWhereInput = {},
+  ) {
     const tenantId = this.tenantId();
     const saleDate = this.saleDateFilter(startDate, endDate);
 
     const where = {
       tenantId,
       status: { in: SOLD_SALE_STATUSES },
+      ...saleScope,
       ...(saleDate && { saleDate }),
     };
 
@@ -174,11 +179,16 @@ export class DashboardsRepository {
     };
   }
 
-  async getSellerRanking(startDate?: Date, endDate?: Date) {
+  async getSellerRanking(
+    startDate?: Date,
+    endDate?: Date,
+    saleScope: Prisma.SaleWhereInput = {},
+  ) {
     const tenantId = this.tenantId();
     const saleDate = this.saleDateFilter(startDate, endDate);
     const periodWhere = {
       tenantId,
+      ...saleScope,
       ...(saleDate && { saleDate }),
     };
 

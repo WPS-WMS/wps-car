@@ -18,4 +18,9 @@ export class ListVehiclesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   licensePlate?: string;
+
+  /** Admin: filtrar por filial (`matriz` ou id da filial) */
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

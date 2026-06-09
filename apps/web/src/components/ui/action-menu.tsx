@@ -50,7 +50,7 @@ export function ActionMenu({
             <DropdownMenuItem
               variant={item.destructive ? 'destructive' : 'default'}
               disabled={item.disabled}
-              onSelect={item.onSelect}
+              onClick={() => item.onSelect()}
             >
               {item.label}
             </DropdownMenuItem>

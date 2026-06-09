@@ -2,7 +2,6 @@ import { Type } from 'class-transformer';
 import { IsDate, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { SaleStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-
 export class ListSalesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(SaleStatus)
@@ -15,6 +14,9 @@ export class ListSalesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   sellerId?: string;
+
+  @IsOptional()
+  branchId?: string;
 
   @IsOptional()
   @IsUUID()

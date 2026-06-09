@@ -7,6 +7,7 @@ import {
   isValidLicensePlate,
   normalizeLicensePlate,
 } from '../../common/utils/license-plate.util';
+import { DataScopeService } from '../../infrastructure/scope/data-scope.service';
 import { TenantContextService } from '../../infrastructure/tenant/tenant-context.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
@@ -20,12 +21,16 @@ export class VehiclesService {
   constructor(
     private readonly vehiclesRepository: VehiclesRepository,
     private readonly tenantContext: TenantContextService,
+    private readonly dataScope: DataScopeService,
     private readonly recalculationService: FinancialRecalculationService,
   ) {}
 
-  async findAll(query: ListVehiclesQueryDto) {
+  async findAll(query: ListVehiclesQueryDto, actor: AuthenticatedUser) {
+    const scope = await this.dataScope.buildVehicleScope(actor, {
+      branchId: query.branchId,
+    });
     const { data, total, page, limit } =
-      await this.vehiclesRepository.findManyPaginated(query);
+      await this.vehiclesRepository.findManyPaginated(query, scope);
 
     return new PaginatedResponseDto(
       data.map(toVehicleResponse),
@@ -35,19 +40,21 @@ export class VehiclesService {
     );
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor: AuthenticatedUser) {
     const vehicle = await this.vehiclesRepository.findById(id);
     if (!vehicle) {
       throw new DomainException('VEHICLE_NOT_FOUND', 'Veículo não encontrado', 404);
     }
+    this.dataScope.assertVehicleAccess(vehicle, actor);
     return toVehicleResponse(vehicle);
   }
 
-  async findByPlate(licensePlate: string) {
+  async findByPlate(licensePlate: string, actor: AuthenticatedUser) {
     const vehicle = await this.vehiclesRepository.findByLicensePlate(licensePlate);
     if (!vehicle) {
       throw new DomainException('VEHICLE_NOT_FOUND', 'Veículo não encontrado', 404);
     }
+    this.dataScope.assertVehicleAccess(vehicle, actor);
     return toVehicleResponse(vehicle);
   }
 
@@ -74,9 +81,12 @@ export class VehiclesService {
       }
     }
 
+    const branchId = await this.dataScope.resolveVehicleBranchId(actor, dto.branchId);
+
     const vehicle = await this.vehiclesRepository.createWithFinancial(
       {
         tenantId,
+        branchId,
         type: dto.type,
         brand: dto.brand,
         model: dto.model,
@@ -114,6 +124,8 @@ export class VehiclesService {
     if (!vehicle) {
       throw new DomainException('VEHICLE_NOT_FOUND', 'Veículo não encontrado', 404);
     }
+
+    this.dataScope.assertVehicleAccess(vehicle, actor);
 
     if (vehicle.status === VehicleStatus.SOLD) {
       throw new DomainException(

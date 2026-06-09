@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { User, UserRole } from '@prisma/client';
+import { User } from '@prisma/client';
 import { DomainException } from '../../../domain/exceptions/domain.exception';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { TenantContextService } from '../../../infrastructure/tenant/tenant-context.service';
@@ -58,6 +58,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenantId,
+        branchId: user.branchId,
         permissions,
       },
     };
@@ -118,6 +119,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenantId,
+        branchId: user.branchId,
         permissions,
       },
     };
@@ -176,14 +178,34 @@ export class AuthService {
       return user;
     }
 
-    const user = await this.prisma.user.findFirst({
-      where: { email: dto.email, role: UserRole.MODERATOR, tenantId: null },
+    const users = await this.prisma.user.findMany({
+      where: { email: dto.email },
     });
 
-    if (!user) {
+    if (users.length === 0) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    if (users.length > 1) {
       throw new UnauthorizedException(
-        'Informe o CNPJ da empresa ou use conta de moderador',
+        'Este e-mail está cadastrado em mais de uma empresa. Contate o administrador.',
       );
+    }
+
+    const user = users[0];
+
+    if (user.tenantId) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: user.tenantId },
+      });
+
+      if (!tenant) {
+        throw new UnauthorizedException('Credenciais inválidas');
+      }
+
+      if (tenant.status !== 'ACTIVE' && tenant.status !== 'TRIAL') {
+        throw new DomainException('TENANT_INACTIVE', 'Empresa inativa ou suspensa', 403);
+      }
     }
 
     return user;

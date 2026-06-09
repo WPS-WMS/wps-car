@@ -7,6 +7,13 @@ import { Toolbar } from '@/components/ui/toolbar';
 import { SelectField } from '@/components/ui/select-field';
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
+import { useAuth } from '@/providers/auth-provider';
+import {
+  AnalyticsScopeFilter,
+  analyticsScopeParams,
+  emptyAnalyticsScope,
+  scopeQueryKey,
+} from '@/components/analytics/analytics-scope-filter';
 import { saleStatusLabels, vehicleTypeLabels } from '@/lib/labels';
 import { defaultPeriodFilter, formatPeriodDescription, resolvePeriodRange } from '@/lib/date-period';
 import { SalesPeriodFilter } from '@/components/sales/sales-period-filter';
@@ -20,29 +27,31 @@ function formatPercent2(value: string | null | undefined) {
 }
 
 export default function GeneralReportPage() {
+  const { isAdmin, isManager } = useAuth();
   const [period, setPeriod] = useState(defaultPeriodFilter());
-  const [sellerId, setSellerId] = useState('');
+  const [scope, setScope] = useState(emptyAnalyticsScope);
   const [vehicleType, setVehicleType] = useState('');
   const [status, setStatus] = useState('');
 
   const range = useMemo(() => resolvePeriodRange(period), [period]);
 
-  const sellersQuery = useQuery({
-    queryKey: ['users', 'sellers', 'general-report'],
-    queryFn: async () => {
-      const res = await api.getUsers({ role: 'SELLER', limit: 100, page: 1 });
-      return res.data;
-    },
-  });
+  const scopeParams = analyticsScopeParams(scope, isAdmin);
 
   const reportQuery = useQuery({
-    queryKey: ['general-report', range?.startDate, range?.endDate, sellerId, vehicleType, status],
+    queryKey: [
+      'general-report',
+      range?.startDate,
+      range?.endDate,
+      scopeQueryKey(scope),
+      vehicleType,
+      status,
+    ],
     enabled: Boolean(range),
     queryFn: async () =>
       api.getGeneralReport({
         startDate: range!.startDate,
         endDate: range!.endDate,
-        sellerId: sellerId || undefined,
+        ...scopeParams,
         vehicleType: vehicleType || undefined,
         status: status || undefined,
       }),
@@ -80,17 +89,13 @@ export default function GeneralReportPage() {
               <SalesPeriodFilter value={period} onChange={setPeriod} />
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <SelectField
-                className="w-full sm:w-64"
-                value={sellerId}
-                onChange={setSellerId}
-                placeholder="Vendedor"
-                aria-label="Filtrar por vendedor"
-                options={[
-                  { value: '', label: 'Todos os vendedores' },
-                  ...(sellersQuery.data ?? []).map((u) => ({ value: u.id, label: u.name })),
-                ]}
-              />
+              {isManager ? (
+                <AnalyticsScopeFilter
+                  value={scope}
+                  onChange={setScope}
+                  className="flex flex-wrap items-end gap-3"
+                />
+              ) : null}
               <SelectField
                 className="w-full sm:w-56"
                 value={vehicleType}

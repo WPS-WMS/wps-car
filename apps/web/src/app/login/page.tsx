@@ -20,7 +20,6 @@ export default function LoginPage() {
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('admin@revendademo.com.br');
   const [password, setPassword] = useState('Admin@123');
-  const [tenantCnpj, setTenantCnpj] = useState('00000000000191');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +34,7 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(email, password, tenantCnpj || undefined);
+      await login(email, password);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha no login');
     } finally {
@@ -116,22 +115,12 @@ export default function LoginPage() {
                   Entrar na sua conta
                 </CardTitle>
                 <CardDescription>
-                  Informe os dados da revenda para continuar
+                  Informe e-mail e senha para continuar
                 </CardDescription>
               </div>
             </CardHeader>
             <CardContent>
               <form noValidate onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tenantCnpj">CNPJ da empresa</Label>
-                  <Input
-                    id="tenantCnpj"
-                    className={inputClass}
-                    placeholder="Somente números"
-                    value={tenantCnpj}
-                    onChange={(e) => setTenantCnpj(e.target.value.replace(/\D/g, ''))}
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">E-mail</Label>
                   <Input
@@ -174,7 +163,7 @@ export default function LoginPage() {
                 </Button>
               </form>
               <p className="mt-5 rounded-[10px] bg-accent px-3 py-2.5 text-center text-xs text-accent-foreground">
-                Demo: admin@revendademo.com.br · Admin@123
+                Demo Alpha: admin@revendademo.com.br · Beta: admin@revendabeta.com.br · Senha: Admin@123
               </p>
             </CardContent>
           </Card>

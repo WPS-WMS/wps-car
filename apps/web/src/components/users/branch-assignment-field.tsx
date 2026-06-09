@@ -3,6 +3,8 @@
 import { FormNativeSelect } from '@/components/vehicles/form-field';
 import { useTenantBranchOptions } from '@/hooks/use-tenant-branch-options';
 
+import { BRANCH_ASSIGNMENT_HINT } from '@/lib/user-branch-rules';
+
 export function BranchAssignmentField({
   label = 'Loja / filial',
   required = true,
@@ -21,18 +23,21 @@ export function BranchAssignmentField({
   const { options, isLoading } = useTenantBranchOptions(true, currentBranch);
 
   return (
-    <FormNativeSelect
-      label={label}
-      required={required}
-      value={value}
-      onChange={onChange}
-      options={
-        isLoading
-          ? [{ value: '', label: 'Carregando filiais…' }]
-          : options
-      }
-      error={error}
-      disabled={isLoading}
-    />
+    <div className="space-y-1">
+      <FormNativeSelect
+        label={label}
+        required={required}
+        value={value}
+        onChange={onChange}
+        options={
+          isLoading
+            ? [{ value: '', label: 'Carregando filiais…' }]
+            : options
+        }
+        error={error}
+        disabled={isLoading}
+      />
+      <p className="text-xs text-muted-foreground">{BRANCH_ASSIGNMENT_HINT}</p>
+    </div>
   );
 }

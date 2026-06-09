@@ -1,8 +1,9 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsDate, IsEnum, IsOptional } from 'class-validator';
 import { SaleStatus, VehicleType } from '@prisma/client';
+import { ScopeFiltersQueryDto } from '../../../common/dto/scope-filters-query.dto';
 
-export class GeneralReportQueryDto {
+export class GeneralReportQueryDto extends ScopeFiltersQueryDto {
   @IsOptional()
   @Type(() => Date)
   @IsDate()
@@ -16,10 +17,6 @@ export class GeneralReportQueryDto {
   @IsOptional()
   @IsEnum(VehicleType)
   vehicleType?: VehicleType;
-
-  @IsOptional()
-  @IsUUID()
-  sellerId?: string;
 
   @IsOptional()
   @IsEnum(SaleStatus)

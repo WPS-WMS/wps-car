@@ -1,21 +1,32 @@
 /**
- * Importação em lote de veículos/produtos via CSV.
+ * Importação em lote de veículos/produtos via CSV (multi-tenant).
  *
  * Uso (na pasta apps/api):
- *   npm run import:vehicles -- --file=../../scripts/vehicles-import.example.csv
- *   npm run import:vehicles -- --file=./meus-veiculos.csv --dry-run
+ *   npm run import:vehicles:alpha
+ *   npm run import:vehicles:beta
+ *   npm run import:vehicles:demo
+ *   npm run import:vehicles -- --file=../../scripts/vehicles-import.example.csv --tenant=alpha
+ *   npm run import:vehicles -- --file=./meus-veiculos.csv --dry-run --tenant=all
  *
  * Variáveis de ambiente (ou .env na raiz do monorepo / apps/api):
- *   IMPORT_API_URL   default http://localhost:3001/api/v1
- *   IMPORT_EMAIL     default admin@revendademo.com.br
- *   IMPORT_PASSWORD  default Admin@123
- *   IMPORT_TENANT_CNPJ default 00000000000191
+ *   IMPORT_API_URL      default http://localhost:3001/api/v1
+ *   IMPORT_TENANT       alpha | beta | all (prioridade sobre CNPJ)
+ *   IMPORT_TENANT_CNPJ  CNPJ da empresa (legado; alpha ou beta)
+ *   IMPORT_EMAIL        sobrescreve e-mail do admin (só com um tenant)
+ *   IMPORT_PASSWORD     sobrescreve senha (só com um tenant)
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  IMPORT_TENANTS,
+  type ImportTenantConfig,
+  type ImportTenantKey,
+  parseImportTenantKey,
+  resolveTargetTenants,
+  tenantFromEnv,
+} from './import-tenant-config';
 
-// Carrega .env da raiz do monorepo ou apps/api
 function loadEnvFile() {
   const candidates = [
     path.resolve(__dirname, '../../../.env'),
@@ -77,6 +88,10 @@ const HEADER_ALIASES: Record<string, string> = {
   purchasedate: 'purchaseDate',
   valor_anunciado: 'listedValue',
   listedvalue: 'listedValue',
+  tenant: 'tenant',
+  empresa: 'tenant',
+  tenant_cnpj: 'tenant',
+  cnpj: 'tenant',
 };
 
 const VEHICLE_TYPES = new Set([
@@ -88,22 +103,38 @@ const VEHICLE_TYPES = new Set([
   'OTHER',
 ]);
 
+type ImportJob = {
+  lineNum: number;
+  row: Record<string, string>;
+  tenantKey: ImportTenantKey;
+};
+
 function parseArgs() {
   const args = process.argv.slice(2);
   let file = '';
   let dryRun = false;
   let delimiter = '';
+  let tenantArg: string | undefined;
 
   for (const arg of args) {
     if (arg === '--dry-run') dryRun = true;
     else if (arg.startsWith('--file=')) file = arg.slice('--file='.length);
     else if (arg.startsWith('--delimiter=')) delimiter = arg.slice('--delimiter='.length);
+    else if (arg.startsWith('--tenant=')) tenantArg = arg.slice('--tenant='.length);
     else if (!arg.startsWith('--') && !file) file = arg;
   }
 
   if (!file) {
     console.error(
-      'Informe o CSV: npm run import:vehicles -- --file=../../scripts/vehicles-import.example.csv',
+      'Informe o CSV: npm run import:vehicles -- --file=../../scripts/vehicles-import-alpha.example.csv --tenant=alpha',
+    );
+    process.exit(1);
+  }
+
+  const parsedTenant = parseImportTenantKey(tenantArg) ?? tenantFromEnv();
+  if (!parsedTenant) {
+    console.error(
+      'Tenant inválido. Use --tenant=alpha, --tenant=beta ou --tenant=all',
     );
     process.exit(1);
   }
@@ -112,6 +143,7 @@ function parseArgs() {
     file: path.resolve(process.cwd(), file),
     dryRun,
     delimiter: delimiter || undefined,
+    tenant: parsedTenant,
   };
 }
 
@@ -177,10 +209,26 @@ function parseCsv(content: string, forcedDelimiter?: string) {
   return { rows, headers };
 }
 
+function buildJobs(
+  rows: Record<string, string>[],
+  cliTenant: ImportTenantKey | 'all',
+): ImportJob[] {
+  const jobs: ImportJob[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const lineNum = i + 2;
+    const targets = resolveTargetTenants(rows[i], cliTenant);
+    for (const tenantKey of targets) {
+      jobs.push({ lineNum, row: rows[i], tenantKey });
+    }
+  }
+
+  return jobs;
+}
+
 function parseNumber(value: string | undefined): number | undefined {
   if (!value?.trim()) return undefined;
   let s = value.trim();
-  // 45.000,00 → 45000.00 | 45000.00 permanece
   if (s.includes(',')) {
     s = s.replace(/\./g, '').replace(',', '.');
   }
@@ -274,22 +322,36 @@ function rowToPayload(row: Record<string, string>, lineNum: number) {
   return payload;
 }
 
-async function login(): Promise<string> {
+function resolveTenantConfig(
+  tenantKey: ImportTenantKey,
+  singleTenantMode: boolean,
+): ImportTenantConfig {
+  const preset = IMPORT_TENANTS[tenantKey];
+  if (!singleTenantMode) return preset;
+
+  return {
+    ...preset,
+    email: process.env.IMPORT_EMAIL ?? preset.email,
+    password: process.env.IMPORT_PASSWORD ?? preset.password,
+  };
+}
+
+async function login(config: ImportTenantConfig): Promise<string> {
   const baseUrl = process.env.IMPORT_API_URL ?? 'http://localhost:3001/api/v1';
   const res = await fetch(`${baseUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: process.env.IMPORT_EMAIL ?? 'admin@revendademo.com.br',
-      password: process.env.IMPORT_PASSWORD ?? 'Admin@123',
-      tenantCnpj: process.env.IMPORT_TENANT_CNPJ ?? '00000000000191',
+      email: config.email,
+      password: config.password,
+      tenantCnpj: config.cnpj,
     }),
   });
 
   const body = (await res.json()) as { accessToken?: string; message?: string };
   if (!res.ok || !body.accessToken) {
     throw new Error(
-      `Login falhou (${res.status}): ${body.message ?? JSON.stringify(body)}`,
+      `Login falhou [${config.label}]: ${body.message ?? JSON.stringify(body)} (${res.status})`,
     );
   }
   return body.accessToken;
@@ -331,7 +393,7 @@ async function createVehicle(
 }
 
 async function main() {
-  const { file, dryRun, delimiter } = parseArgs();
+  const { file, dryRun, delimiter, tenant } = parseArgs();
 
   if (!fs.existsSync(file)) {
     console.error(`Arquivo não encontrado: ${file}`);
@@ -346,39 +408,47 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Arquivo: ${file}`);
-  console.log(`Linhas: ${rows.length}${dryRun ? ' (simulação — dry-run)' : ''}\n`);
+  const jobs = buildJobs(rows, tenant);
+  const singleTenantMode = tenant !== 'all';
 
-  let token: string | null = null;
-  if (!dryRun) {
-    console.log('Autenticando…');
-    token = await login();
-    console.log('OK\n');
-  }
+  console.log(`Arquivo: ${file}`);
+  console.log(`Linhas no CSV: ${rows.length}`);
+  console.log(`Modo tenant: ${tenant}`);
+  console.log(`Operações: ${jobs.length}${dryRun ? ' (simulação — dry-run)' : ''}\n`);
+
+  const tokenByTenant = new Map<ImportTenantKey, string>();
 
   let ok = 0;
   let fail = 0;
 
-  for (let i = 0; i < rows.length; i++) {
-    const lineNum = i + 2;
+  for (const job of jobs) {
+    const config = resolveTenantConfig(job.tenantKey, singleTenantMode);
+    const tenantTag = `[${config.key.toUpperCase()}]`;
+
     try {
-      const payload = rowToPayload(rows[i], lineNum);
+      const payload = rowToPayload(job.row, job.lineNum);
       if (dryRun) {
         console.log(
-          `[dry-run] Linha ${lineNum}: ${payload.type} ${payload.brand} ${payload.model}`,
+          `[dry-run] ${tenantTag} Linha ${job.lineNum}: ${payload.type} ${payload.brand} ${payload.model}`,
         );
         ok++;
         continue;
       }
 
-      const created = await createVehicle(token!, payload);
+      if (!tokenByTenant.has(job.tenantKey)) {
+        console.log(`Autenticando ${config.label} (${config.cnpj})…`);
+        tokenByTenant.set(job.tenantKey, await login(config));
+        console.log('OK\n');
+      }
+
+      const created = await createVehicle(tokenByTenant.get(job.tenantKey)!, payload);
       console.log(
-        `✓ Linha ${lineNum}: ${created.brand} ${created.model} (id: ${created.id})`,
+        `✓ ${tenantTag} Linha ${job.lineNum}: ${created.brand} ${created.model} (id: ${created.id})`,
       );
       ok++;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`✗ Linha ${lineNum}: ${msg}`);
+      console.error(`✗ ${tenantTag} Linha ${job.lineNum}: ${msg}`);
       fail++;
     }
   }

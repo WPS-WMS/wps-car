@@ -29,24 +29,27 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { BranchFilterField } from '@/components/filters/branch-filter-field';
 
 export default function VeiculosPage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const canCreate = hasPermission(user, 'vehicles:create');
   const canUpdate = hasPermission(user, 'vehicles:update');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
 
   const query = useQuery({
-    queryKey: ['vehicles', 'list', { search, status, page }],
+    queryKey: ['vehicles', 'list', { search, status, page, branchFilter, isAdmin }],
     queryFn: () =>
       api.getVehicles({
         page,
         limit: 20,
         ...(search ? { search } : {}),
         ...(status ? { status } : {}),
+        ...(isAdmin && branchFilter !== 'all' ? { branchId: branchFilter } : {}),
       }),
   });
 
@@ -111,6 +114,21 @@ export default function VeiculosPage() {
               })),
             ]}
           />
+          {isAdmin ? (
+            <div className="mt-4 max-w-xs">
+              <label className="text-sm font-medium text-muted-foreground" htmlFor="filter-branch">
+                Filial
+              </label>
+              <BranchFilterField
+                value={branchFilter}
+                onChange={(v) => {
+                  setBranchFilter(v);
+                  setPage(1);
+                }}
+                className="mt-2 w-full"
+              />
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -124,6 +142,7 @@ export default function VeiculosPage() {
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
                   <TableHead>Tipo</TableHead>
                   <TableHead>Veículo</TableHead>
+                  {isAdmin ? <TableHead>Filial</TableHead> : null}
                   <TableHead>Ano</TableHead>
                   <TableHead>Placa</TableHead>
                   <TableHead>Cor</TableHead>
@@ -152,6 +171,11 @@ export default function VeiculosPage() {
                         </>
                       )}
                     </TableCell>
+                    {isAdmin ? (
+                      <TableCell className="text-muted-foreground">
+                        {v.branchName ?? 'Matriz'}
+                      </TableCell>
+                    ) : null}
                     <TableCell>
                       {v.manufactureYear}/{v.modelYear}
                     </TableCell>
@@ -181,7 +205,7 @@ export default function VeiculosPage() {
                 {!items.length ? (
                   <TableRow>
                     <TableCell
-                      colSpan={canUpdate ? 8 : 7}
+                      colSpan={canUpdate ? (isAdmin ? 9 : 8) : isAdmin ? 8 : 7}
                       className="py-10 text-center text-muted-foreground"
                     >
                       Nenhum veículo encontrado

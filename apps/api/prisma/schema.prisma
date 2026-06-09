@@ -8,8 +8,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Migrations usam conexão direta (Neon pooler não suporta advisory lock do Prisma)
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // -----------------------------------------------------------------------------
@@ -364,8 +366,10 @@ model Vehicle {
   updatedAt       DateTime         @updatedAt @map("updated_at")
   createdById     String?          @map("created_by_id")
   updatedById     String?          @map("updated_by_id")
+  branchId        String?          @map("branch_id")
 
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch    TenantBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
   createdBy User?  @relation("VehicleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy User?  @relation("VehicleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
@@ -381,6 +385,7 @@ model Vehicle {
   @@unique([tenantId, chassis])
   @@index([tenantId, status])
   @@index([tenantId, brand, model])
+  @@index([tenantId, branchId])
   @@map("vehicles")
 }
 
@@ -809,8 +814,9 @@ model TenantBranch {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  users  User[]
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users    User[]
+  vehicles Vehicle[]
 
   @@index([tenantId])
   @@map("tenant_branches")

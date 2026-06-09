@@ -29,6 +29,7 @@ export class JwtUserLoaderService {
       name: user.name,
       role: user.role,
       tenantId: user.tenantId,
+      branchId: user.branchId,
       permissions,
     };
   }

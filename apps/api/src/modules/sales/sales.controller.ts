@@ -60,11 +60,13 @@ export class SalesController {
   sellerCommissions(
     @Param('sellerId', ParseUUIDPipe) sellerId: string,
     @Query() query: ListSalesQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.salesService.getSellerCommissionSummary(
       sellerId,
       query.startDate,
       query.endDate,
+      actor,
     );
   }
 

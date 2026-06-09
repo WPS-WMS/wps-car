@@ -221,6 +221,7 @@ export const api = {
     endDate?: string;
     vehicleType?: string;
     sellerId?: string;
+    branchId?: string;
     status?: string;
   }) => {
     const qs = new URLSearchParams();
@@ -234,6 +235,7 @@ export const api = {
 
   getCommissionReport: (params: {
     sellerId?: string;
+    branchId?: string;
     startDate?: string;
     endDate?: string;
     vehicleType?: string;
@@ -340,10 +342,16 @@ export const api = {
       `/suppliers/${id}/purchases`,
     ).then(unwrap),
 
-  getManagerDashboard: (params?: { startDate?: string; endDate?: string }) => {
+  getManagerDashboard: (params?: {
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+    sellerId?: string;
+  }) => {
     const qs = new URLSearchParams();
-    if (params?.startDate) qs.set('startDate', params.startDate);
-    if (params?.endDate) qs.set('endDate', params.endDate);
+    Object.entries(params ?? {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
     const q = qs.toString();
     return apiRequest<ManagerDashboard | ApiSuccess<ManagerDashboard>>(
       `/dashboard/manager${q ? `?${q}` : ''}`,
@@ -360,10 +368,16 @@ export const api = {
     ).then(unwrap);
   },
 
-  getSellerRanking: (params?: { startDate?: string; endDate?: string }) => {
+  getSellerRanking: (params?: {
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+    sellerId?: string;
+  }) => {
     const qs = new URLSearchParams();
-    if (params?.startDate) qs.set('startDate', params.startDate);
-    if (params?.endDate) qs.set('endDate', params.endDate);
+    Object.entries(params ?? {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v));
+    });
     const q = qs.toString();
     return apiRequest<SellerRanking | ApiSuccess<SellerRanking>>(
       `/dashboard/seller/ranking${q ? `?${q}` : ''}`,

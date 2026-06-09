@@ -14,6 +14,12 @@ import {
 } from '@/lib/date-period';
 import { paymentMethodLabels, saleStatusLabels, saleStatusVariant } from '@/lib/labels';
 import { useAuth } from '@/providers/auth-provider';
+import {
+  AnalyticsScopeFilter,
+  analyticsScopeParams,
+  emptyAnalyticsScope,
+  scopeQueryKey,
+} from '@/components/analytics/analytics-scope-filter';
 import { hasPermission } from '@/lib/permissions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,7 +42,8 @@ import {
 } from '@/components/ui/table';
 
 export default function VendasPage() {
-  const { user, isManager } = useAuth();
+  const { user, isManager, isAdmin } = useAuth();
+  const [scope, setScope] = useState(emptyAnalyticsScope);
   const canRead = hasPermission(user, 'sales:read');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -56,10 +63,11 @@ export default function VendasPage() {
 
   const metricTitles = periodMetricTitles(periodFilter.preset);
   const periodDescription = formatPeriodDescription(periodFilter, periodRange);
+  const scopeParams = analyticsScopeParams(scope, isAdmin);
 
   const managerDash = useQuery({
-    queryKey: ['dashboard', 'manager', periodParams],
-    queryFn: () => api.getManagerDashboard(periodParams),
+    queryKey: ['dashboard', 'manager', periodParams, scopeQueryKey(scope)],
+    queryFn: () => api.getManagerDashboard({ ...periodParams, ...scopeParams }),
     enabled: isManager && !!periodRange,
   });
 
@@ -73,13 +81,14 @@ export default function VendasPage() {
     (isManager ? managerDash.isFetching : sellerDash.isFetching) && !!periodRange;
 
   const query = useQuery({
-    queryKey: ['sales', { search, status, page }],
+    queryKey: ['sales', { search, status, page, ...scopeQueryKey(scope) }],
     queryFn: () =>
       api.getSales({
         page,
         limit: 20,
         ...(search ? { search } : {}),
         ...(status ? { status } : {}),
+        ...scopeParams,
       }),
     enabled: canRead,
   });
@@ -118,11 +127,16 @@ export default function VendasPage() {
         <SaleFormDialog />
       </PageHeader>
 
-      <SalesPeriodFilter
-        value={periodFilter}
-        onChange={setPeriodFilter}
-        description={periodDescription}
-      />
+      <div className="space-y-4">
+        <SalesPeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          description={periodDescription}
+        />
+        {isManager ? (
+          <AnalyticsScopeFilter value={scope} onChange={setScope} />
+        ) : null}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard

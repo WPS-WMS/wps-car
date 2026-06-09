@@ -12,14 +12,13 @@ export async function loginAsAdmin(): Promise<string> {
     .send({
       email: E2E_DEFAULTS.email,
       password: E2E_DEFAULTS.password,
-      tenantCnpj: E2E_DEFAULTS.tenantCnpj,
     })
     .expect(200);
 
   const token = res.body.accessToken as string | undefined;
   if (!token) {
     throw new Error(
-      'Login E2E falhou: verifique seed, DATABASE_URL e credenciais (E2E_EMAIL / E2E_PASSWORD / E2E_TENANT_CNPJ).',
+      'Login E2E falhou: verifique seed, DATABASE_URL e credenciais (E2E_EMAIL / E2E_PASSWORD).',
     );
   }
   return token;

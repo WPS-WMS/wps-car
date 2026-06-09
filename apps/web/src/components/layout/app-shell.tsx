@@ -48,8 +48,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="flex w-[260px] shrink-0 flex-col bg-sidebar-gradient text-sidebar-foreground shadow-xl">
+    <div className="flex h-screen overflow-hidden bg-background">
+      <aside className="flex h-full w-[260px] shrink-0 flex-col bg-sidebar-gradient text-sidebar-foreground shadow-xl">
         <div className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 shadow-lg">
@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {nav.map((item) => {
             const Icon = item.icon;
             const active = pathname.startsWith(item.href);
@@ -86,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </nav>
 
-        <div className="border-t border-white/10 p-4">
+        <div className="shrink-0 border-t border-white/10 p-4">
           <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/80 px-3 py-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
               {userInitial(user?.name)}
@@ -108,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto bg-background">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-background">
         <div className="mx-auto max-w-7xl p-6 lg:p-8">{children}</div>
       </main>
     </div>

@@ -23,6 +23,7 @@ export interface AuthUser {
   email: string;
   role: 'ADMIN' | 'MANAGER' | 'SELLER' | 'MODERATOR';
   tenantId: string | null;
+  branchId?: string | null;
   permissions: string[];
 }
 
@@ -48,6 +49,8 @@ export interface StockItem {
   expectedMargin: string | null;
   status: string;
   daysInStock: number | null;
+  branchId?: string | null;
+  branchName?: string;
 }
 
 export interface Sale {
@@ -359,6 +362,8 @@ export interface Vehicle {
   category: string | null;
   status: string;
   notes: string | null;
+  branchId?: string | null;
+  branchName?: string;
   financial: VehicleFinancial | null;
   primaryPhoto: VehiclePhoto | null;
   photos?: VehiclePhoto[];

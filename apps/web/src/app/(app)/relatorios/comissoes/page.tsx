@@ -10,6 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
+import {
+  AnalyticsScopeFilter,
+  analyticsScopeParams,
+  emptyAnalyticsScope,
+  scopeQueryKey,
+} from '@/components/analytics/analytics-scope-filter';
 import { saleStatusLabels, vehicleTypeLabels } from '@/lib/labels';
 import { defaultPeriodFilter, formatPeriodDescription, resolvePeriodRange } from '@/lib/date-period';
 import { SalesPeriodFilter } from '@/components/sales/sales-period-filter';
@@ -23,34 +29,33 @@ function saleStatusVariant(status: string): 'default' | 'secondary' | 'destructi
 }
 
 export default function CommissionReportPage() {
-  const { user } = useAuth();
+  const { user, isManager, isAdmin } = useAuth();
   const isSeller = user?.role === 'SELLER';
-  const isManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const [period, setPeriod] = useState(defaultPeriodFilter());
-  const [sellerId, setSellerId] = useState('');
+  const [scope, setScope] = useState(emptyAnalyticsScope);
   const [vehicleType, setVehicleType] = useState('');
   const [status, setStatus] = useState('');
 
   const range = useMemo(() => resolvePeriodRange(period), [period]);
 
-  const sellersQuery = useQuery({
-    queryKey: ['users', 'sellers', isManager],
-    enabled: Boolean(isManager),
-    queryFn: async () => {
-      const res = await api.getUsers({ role: 'SELLER', limit: 100, page: 1 });
-      return res.data;
-    },
-  });
+  const scopeParams = isSeller ? {} : analyticsScopeParams(scope, isAdmin);
 
   const reportQuery = useQuery({
-    queryKey: ['commission-report', range?.startDate, range?.endDate, sellerId, vehicleType, status],
+    queryKey: [
+      'commission-report',
+      range?.startDate,
+      range?.endDate,
+      scopeQueryKey(scope),
+      vehicleType,
+      status,
+    ],
     enabled: Boolean(range),
     queryFn: async () =>
       api.getCommissionReport({
         startDate: range!.startDate,
         endDate: range!.endDate,
-        sellerId: isSeller ? undefined : sellerId || undefined,
+        ...scopeParams,
         vehicleType: vehicleType || undefined,
         status: status || undefined,
       }),
@@ -76,16 +81,10 @@ export default function CommissionReportPage() {
             </div>
             <div className="flex flex-wrap items-end gap-3">
               {isManager ? (
-                <SelectField
-                  className="w-full sm:w-64"
-                  value={sellerId}
-                  onChange={setSellerId}
-                  placeholder="Vendedor"
-                  aria-label="Filtrar por vendedor"
-                  options={[
-                    { value: '', label: 'Todos os vendedores' },
-                    ...(sellersQuery.data ?? []).map((u) => ({ value: u.id, label: u.name })),
-                  ]}
+                <AnalyticsScopeFilter
+                  value={scope}
+                  onChange={setScope}
+                  className="flex flex-wrap items-end gap-3"
                 />
               ) : null}
               <SelectField

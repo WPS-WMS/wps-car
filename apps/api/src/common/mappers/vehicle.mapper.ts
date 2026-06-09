@@ -1,4 +1,5 @@
 import {
+  TenantBranch,
   Vehicle,
   VehicleFinancial,
   VehiclePhoto,
@@ -10,7 +11,15 @@ type VehicleWithRelations = Vehicle & {
   photos?: VehiclePhoto[];
   financial?: VehicleFinancial | null;
   costs?: VehicleCost[];
+  branch?: Pick<TenantBranch, 'id' | 'name'> | null;
 };
+
+function toBranchSummary(vehicle: VehicleWithRelations) {
+  return {
+    branchId: vehicle.branchId,
+    branchName: vehicle.branch?.name ?? 'Matriz',
+  };
+}
 
 export function toPhotoResponse(photo: VehiclePhoto) {
   return {
@@ -72,6 +81,7 @@ export function toVehicleResponse(vehicle: VehicleWithRelations) {
     category: vehicle.category,
     status: vehicle.status,
     notes: vehicle.notes,
+    ...toBranchSummary(vehicle),
     financial: toFinancialSummary(vehicle.financial),
     primaryPhoto: primaryPhoto ? toPhotoResponse(primaryPhoto) : null,
     photos: vehicle.photos?.map(toPhotoResponse),
@@ -111,5 +121,6 @@ export function toStockItemResponse(vehicle: VehicleWithRelations) {
     expectedMargin: expectedMargin !== null ? expectedMargin.toFixed(2) : null,
     status: vehicle.status,
     daysInStock: financial?.daysInStock ?? null,
+    ...toBranchSummary(vehicle),
   };
 }

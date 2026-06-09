@@ -10,7 +10,15 @@ import { ListVehiclesQueryDto } from '../dto/list-vehicles-query.dto';
 const vehicleInclude = {
   photos: { orderBy: { sortOrder: 'asc' as const } },
   financial: true,
+  branch: { select: { id: true, name: true } },
 } satisfies Prisma.VehicleInclude;
+
+const listOrderBy: Prisma.VehicleOrderByWithRelationInput[] = [
+  { branch: { name: 'asc' } },
+  { brand: 'asc' },
+  { model: 'asc' },
+  { createdAt: 'desc' },
+];
 
 @Injectable()
 export class VehiclesRepository extends TenantScopedRepository {
@@ -25,11 +33,15 @@ export class VehiclesRepository extends TenantScopedRepository {
     return this.tenantContext.requireTenantId();
   }
 
-  private buildWhere(query: ListVehiclesQueryDto): Prisma.VehicleWhereInput {
+  private buildWhere(
+    query: ListVehiclesQueryDto,
+    scope: Prisma.VehicleWhereInput = {},
+  ): Prisma.VehicleWhereInput {
     const tenantId = this.tenantId();
 
     return {
       tenantId,
+      ...scope,
       ...(query.status && { status: query.status }),
       ...(query.type && { type: query.type }),
       ...(query.brand && {
@@ -49,16 +61,19 @@ export class VehiclesRepository extends TenantScopedRepository {
     };
   }
 
-  async findManyPaginated(query: ListVehiclesQueryDto) {
+  async findManyPaginated(
+    query: ListVehiclesQueryDto,
+    scope: Prisma.VehicleWhereInput = {},
+  ) {
     const { page, limit, skip, orderBy } = resolvePagination(query);
-    const where = this.buildWhere(query);
+    const where = this.buildWhere(query, scope);
 
     const [data, total] = await Promise.all([
       this.prisma.vehicle.findMany({
         where,
         skip,
         take: limit,
-        orderBy: orderBy ?? { createdAt: 'desc' },
+        orderBy: orderBy ?? listOrderBy,
         include: vehicleInclude,
       }),
       this.prisma.vehicle.count({ where }),
@@ -148,7 +163,11 @@ export class VehiclesRepository extends TenantScopedRepository {
     return this.prisma.vehicle.delete({ where: { id } });
   }
 
-  async findStockPaginated(query: ListVehiclesQueryDto, stockStatuses?: VehicleStatus[]) {
+  async findStockPaginated(
+    query: ListVehiclesQueryDto,
+    stockStatuses?: VehicleStatus[],
+    scope: Prisma.VehicleWhereInput = {},
+  ) {
     const stockQuery = {
       ...query,
       status: query.status,
@@ -156,7 +175,7 @@ export class VehiclesRepository extends TenantScopedRepository {
 
     const { page, limit, skip, orderBy } = resolvePagination(stockQuery);
     const where: Prisma.VehicleWhereInput = {
-      ...this.buildWhere(stockQuery),
+      ...this.buildWhere(stockQuery, scope),
       ...(stockStatuses &&
         !query.status && {
           status: { in: stockStatuses },
@@ -168,7 +187,7 @@ export class VehiclesRepository extends TenantScopedRepository {
         where,
         skip,
         take: limit,
-        orderBy: orderBy ?? { createdAt: 'desc' },
+        orderBy: orderBy ?? listOrderBy,
         include: vehicleInclude,
       }),
       this.prisma.vehicle.count({ where }),

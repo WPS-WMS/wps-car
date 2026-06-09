@@ -29,24 +29,27 @@ import { ExportButtons } from '@/components/reports/export-buttons';
 import { PageHeader } from '@/components/layout/page-header';
 import { SelectField } from '@/components/ui/select-field';
 import { Card } from '@/components/ui/card';
+import { BranchFilterField } from '@/components/filters/branch-filter-field';
 
 export default function EstoquePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const canCreate = hasPermission(user, 'vehicles:create');
   const canUpdate = hasPermission(user, 'vehicles:update');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
 
   const query = useQuery({
-    queryKey: ['stock', { search, status, page }],
+    queryKey: ['stock', { search, status, page, branchFilter, isAdmin }],
     queryFn: () =>
       api.getStock({
         page,
         limit: 20,
         ...(search ? { search } : {}),
         ...(status ? { status } : {}),
+        ...(isAdmin && branchFilter !== 'all' ? { branchId: branchFilter } : {}),
       }),
   });
 
@@ -99,6 +102,15 @@ export default function EstoquePage() {
             })),
           ]}
         />
+        {isAdmin ? (
+          <BranchFilterField
+            value={branchFilter}
+            onChange={(v) => {
+              setBranchFilter(v);
+              setPage(1);
+            }}
+          />
+        ) : null}
         </div>
       </Card>
 
@@ -111,6 +123,7 @@ export default function EstoquePage() {
               <TableRow>
                 <TableHead className="w-16">Foto</TableHead>
                 <TableHead>Veículo</TableHead>
+                {isAdmin ? <TableHead>Filial</TableHead> : null}
                 <TableHead>Placa</TableHead>
                 <TableHead>Compra</TableHead>
                 <TableHead>Custos</TableHead>
@@ -173,6 +186,9 @@ export default function EstoquePage() {
                       )}
                       <span className="block text-xs text-brand-600">{item.year}</span>
                     </TableCell>
+                    {isAdmin ? (
+                      <TableCell className="text-brand-700">{item.branchName ?? 'Matriz'}</TableCell>
+                    ) : null}
                     <TableCell>{item.licensePlate ?? '—'}</TableCell>
                     <TableCell>{formatCurrency(item.purchaseValue)}</TableCell>
                     <TableCell>{formatCurrency(item.totalCosts)}</TableCell>
@@ -205,7 +221,7 @@ export default function EstoquePage() {
               {!items.length ? (
                 <TableRow>
                   <TableCell
-                    colSpan={canUpdate ? 10 : 9}
+                    colSpan={canUpdate ? (isAdmin ? 11 : 10) : isAdmin ? 10 : 9}
                     className="text-center text-brand-600"
                   >
                     Nenhum veículo encontrado

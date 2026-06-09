@@ -99,13 +99,13 @@ export class ReportsRepository {
 
   async getSalesRows(
     query: ExportReportQueryDto,
-    sellerId?: string,
+    saleScope: import('@prisma/client').Prisma.SaleWhereInput = {},
   ): Promise<SalesReportRow[]> {
     const endDate = this.normalizeEnd(query.endDate);
     const sales = await this.prisma.sale.findMany({
       where: {
         tenantId: this.tenantId(),
-        ...(sellerId && { sellerId }),
+        ...saleScope,
         ...(query.status && { status: query.status }),
         ...(query.startDate || query.endDate
           ? {
@@ -141,11 +141,12 @@ export class ReportsRepository {
   async getSummaryData(
     startDate?: Date,
     endDate?: Date,
+    saleScope: import('@prisma/client').Prisma.SaleWhereInput = {},
   ): Promise<SummaryReportData> {
     const [stock, sales, ranking] = await Promise.all([
       this.dashboardsRepository.getStockMetrics(),
-      this.dashboardsRepository.getSalesMetrics(startDate, endDate),
-      this.dashboardsRepository.getSellerRanking(startDate, endDate),
+      this.dashboardsRepository.getSalesMetrics(startDate, endDate, saleScope),
+      this.dashboardsRepository.getSellerRanking(startDate, endDate, saleScope),
     ]);
 
     const periodLabel = this.formatPeriodLabel(startDate, endDate);
@@ -176,13 +177,16 @@ export class ReportsRepository {
     };
   }
 
-  async getGeneralReport(query: GeneralReportQueryDto) {
+  async getGeneralReport(
+    query: GeneralReportQueryDto,
+    saleScope: Prisma.SaleWhereInput = {},
+  ) {
     const tenantId = this.tenantId();
     const endDate = this.normalizeEnd(query.endDate);
 
     const where: Prisma.SaleWhereInput = {
       tenantId,
-      ...(query.sellerId && { sellerId: query.sellerId }),
+      ...saleScope,
       ...(query.status && { status: query.status }),
       ...(query.startDate || endDate
         ? {

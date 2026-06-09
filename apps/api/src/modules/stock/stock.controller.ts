@@ -13,14 +13,20 @@ export class StockController {
 
   @Get()
   @Permissions('stock:read')
-  listInventory(@Query() query: ListVehiclesQueryDto) {
-    return this.stockService.listInventory(query);
+  listInventory(
+    @Query() query: ListVehiclesQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.stockService.listInventory(query, actor);
   }
 
   @Get('plate/:plate')
   @Permissions('stock:read')
-  findByPlate(@Param('plate') plate: string) {
-    return this.stockService.findByPlate(plate);
+  findByPlate(
+    @Param('plate') plate: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.stockService.findByPlate(plate, actor);
   }
 
   @Get('movements')

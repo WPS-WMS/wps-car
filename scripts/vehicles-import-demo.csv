@@ -1,0 +1,8 @@
+# Estoque demo das duas empresas — coluna tenant: alpha | beta
+tipo,marca,modelo,versao,ano_fabricacao,ano_modelo,placa,cor,km,combustivel,cambio,portas,categoria,status,observacoes,valor_compra,data_compra,valor_anunciado,tenant
+CAR,Volkswagen,Gol,1.0 MSI,2020,2021,ALP1D23,Prata,45000,FLEX,MANUAL,4,HATCH,IN_STOCK,Alpha - centro,45000.00,2026-05-01,52000.00,alpha
+CAR,Fiat,Argo,Drive,2019,2020,ALP2D45,Branco,62000,FLEX,AUTOMATIC,4,HATCH,IN_STOCK,Alpha - ABC,38000.00,2026-05-10,44000.00,alpha
+PRODUCT,Bosch,Kit revisao,,2026,2026,,,,,,,,IN_STOCK,Produto Alpha,890.50,2026-05-15,1299.90,alpha
+CAR,Chevrolet,Onix,LT,2021,2022,BET1A23,Preto,32000,FLEX,AUTOMATIC,4,HATCH,IN_STOCK,Beta - Campinas,52000.00,2026-05-02,59000.00,beta
+CAR,Hyundai,HB20,Comfort,2018,2019,BET2B45,Vermelho,78000,FLEX,MANUAL,4,HATCH,IN_STOCK,Beta - Santos,34000.00,2026-05-08,39900.00,beta
+PRODUCT,Michelin,Kit tapetes,,2026,2026,,,,,,,,IN_STOCK,Produto Beta,420.00,2026-05-12,699.90,beta

@@ -21,22 +21,24 @@ flowchart LR
 
 1. Crie um projeto no Neon (ex.: `wps-car-qa`).
 2. Crie um branch `qa` ou use `main` dedicado só a homologação.
-3. Em **Connection details**, copie a URL **pooled** (recomendado para Render):
-   ```
-   postgresql://USER:PASSWORD@ep-xxxx-pooler.REGION.aws.neon.tech/neondb?sslmode=require
-   ```
-4. Guarde como `DATABASE_URL` (não commitar).
+3. Em **Connection details**, copie **duas** URLs:
+   - **Pooled** (`-pooler` no host) → `DATABASE_URL` (API no Render)
+   - **Direct** (sem `-pooler`) → `DIRECT_DATABASE_URL` (migrations Prisma)
+4. Guarde as duas (não commitar).
 
 **Migrações e seed (uma vez, da sua máquina):**
 
 ```powershell
 cd apps/api
-$env:DATABASE_URL="postgresql://..."   # URL do Neon
+$env:DATABASE_URL="postgresql://...@ep-xxxx-pooler....neon.tech/neondb?sslmode=require"
+$env:DIRECT_DATABASE_URL="postgresql://...@ep-xxxx....neon.tech/neondb?sslmode=require"
 npx prisma migrate deploy
 npm run db:seed
 ```
 
-O Render também roda `prisma migrate deploy` no `startCommand` a cada deploy.
+> **P1002 (advisory lock):** quase sempre é `migrate deploy` só com URL pooler. Use `DIRECT_DATABASE_URL` sem `-pooler`.
+
+O Render roda `prisma migrate deploy` no **build** (uma vez por deploy), não a cada restart.
 
 ---
 
@@ -54,14 +56,18 @@ O Render também roda `prisma migrate deploy` no `startCommand` a cada deploy.
 |-------|--------|
 | Root Directory | `apps/api` |
 | Build Command | `npm ci --include=dev && npx prisma generate && npm run build` |
-| Start Command | `npx prisma migrate deploy && npm run start:prod` |
+| Pre-Deploy Command | `bash scripts/prisma-migrate-deploy.sh` |
+| Start Command | `npm run start:render` |
+
+> **Importante:** se no log aparecer `Running 'npx prisma migrate deploy && npm run start:prod'`, o painel do Render **não** está usando o `render.yaml`. Abra **Settings → Start Command** e cole exatamente: `npm run start:render`
 | Health Check Path | `/api/v1/health` |
 
 ### Variáveis de ambiente (obrigatórias)
 
 | Variável | Exemplo / nota |
 |----------|----------------|
-| `DATABASE_URL` | URL Neon com `?sslmode=require` |
+| `DATABASE_URL` | URL Neon **pooled** (`-pooler`) com `?sslmode=require` |
+| `DIRECT_DATABASE_URL` | URL Neon **direct** (sem `-pooler`) — obrigatória para migrations |
 | `JWT_ACCESS_SECRET` | Mín. 32 caracteres aleatórios |
 | `JWT_REFRESH_SECRET` | Mín. 32 caracteres aleatórios |
 | `CORS_ORIGIN` | URLs do Firebase, **separadas por vírgula** |
@@ -226,7 +232,8 @@ Exemplo de ordem em release:
 | `Failed to list functions` | Deploy antigo com SSR/frameworks | Usar `firebase.json` estático atual (`public: apps/web/out`) |
 | CORS blocked | `CORS_ORIGIN` sem URL do Firebase | Adicionar `.web.app` e `.firebaseapp.com` |
 | 502 / timeout API | Render free dormindo | Aguardar ou upgrade de plano |
-| Prisma P1001 | `DATABASE_URL` errada / Neon pausado | Verificar URL pooled + SSL |
+| Prisma P1001 no Render | Neon “dormindo”, `DIRECT_DATABASE_URL` ausente, ou migrate no **Start** | 1) Painel Render → **Start Command** = `npm run start:prod` (não `migrate deploy && …`). 2) Definir `DIRECT_DATABASE_URL` (URL **sem** `-pooler`). 3) Acordar o Neon (abrir console ou rodar migrate local). 4) Adicionar `&connect_timeout=30` na URL direct. 5) Pre-Deploy usa `scripts/prisma-migrate-deploy.sh` (retry automático). |
+| Prisma P1002 (advisory lock) | Lock preso ou dois `migrate deploy` ao mesmo tempo (local + Render) | `npm run db:unlock` com `DIRECT_DATABASE_URL`; depois `prisma:migrate:deploy` |
 | Login 401 | Seed não rodou no Neon | `npm run db:seed` com `DATABASE_URL` do Neon |
 | Fotos quebradas | Upload efêmero no Render | Esperado em QA; usar S3 depois |
 

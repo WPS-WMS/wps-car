@@ -4,6 +4,7 @@ import { DomainException } from '../../domain/exceptions/domain.exception';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { toStockItemResponse } from '../../common/mappers/vehicle.mapper';
 import { toStockMovementResponse } from '../../common/mappers/stock.mapper';
+import { DataScopeService } from '../../infrastructure/scope/data-scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { ListVehiclesQueryDto } from '../vehicles/dto/list-vehicles-query.dto';
 import { VehiclesRepository } from '../vehicles/repositories/vehicles.repository';
@@ -30,11 +31,15 @@ export class StockService {
   constructor(
     private readonly vehiclesRepository: VehiclesRepository,
     private readonly stockRepository: StockRepository,
+    private readonly dataScope: DataScopeService,
   ) {}
 
-  async listInventory(query: ListVehiclesQueryDto) {
+  async listInventory(query: ListVehiclesQueryDto, actor: AuthenticatedUser) {
+    const scope = await this.dataScope.buildVehicleScope(actor, {
+      branchId: query.branchId,
+    });
     const { data, total, page, limit } =
-      await this.vehiclesRepository.findStockPaginated(query, IN_STOCK_STATUSES);
+      await this.vehiclesRepository.findStockPaginated(query, IN_STOCK_STATUSES, scope);
 
     return new PaginatedResponseDto(
       data.map(toStockItemResponse),
@@ -44,11 +49,12 @@ export class StockService {
     );
   }
 
-  async findByPlate(licensePlate: string) {
+  async findByPlate(licensePlate: string, actor: AuthenticatedUser) {
     const vehicle = await this.vehiclesRepository.findByLicensePlate(licensePlate);
     if (!vehicle) {
       throw new DomainException('VEHICLE_NOT_FOUND', 'Veículo não encontrado no estoque', 404);
     }
+    this.dataScope.assertVehicleAccess(vehicle, actor);
     return toStockItemResponse(vehicle);
   }
 
@@ -69,6 +75,8 @@ export class StockService {
     if (!vehicle) {
       throw new DomainException('VEHICLE_NOT_FOUND', 'Veículo não encontrado', 404);
     }
+
+    this.dataScope.assertVehicleAccess(vehicle, actor);
 
     if (vehicle.status === VehicleStatus.SOLD) {
       throw new DomainException(

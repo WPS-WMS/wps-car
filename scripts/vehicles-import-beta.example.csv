@@ -1,0 +1,5 @@
+# Revenda Beta WPS — CNPJ 11222333000181
+tipo,marca,modelo,versao,ano_fabricacao,ano_modelo,placa,renavam,chassi,cor,km,combustivel,cambio,portas,categoria,status,observacoes,valor_compra,data_compra,valor_anunciado
+CAR,Chevrolet,Onix,LT,2021,2022,BET1A23,,,Preto,32000,FLEX,AUTOMATIC,4,HATCH,IN_STOCK,Estoque Beta - Campinas,52000.00,2026-05-02,59000.00
+CAR,Hyundai,HB20,Comfort,2018,2019,BET2B45,,,Vermelho,78000,FLEX,MANUAL,4,HATCH,IN_STOCK,Estoque Beta - Santos,34000.00,2026-05-08,39900.00
+PRODUCT,Michelin,Kit tapetes premium,,2026,2026,,,,,,,,,,IN_STOCK,Produto mostruario Beta,420.00,2026-05-12,699.90

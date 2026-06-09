@@ -55,7 +55,9 @@ export class UsersService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
-    const branchId = await this.resolveBranchId(dto.branchId);
+    const branchId = await this.resolveBranchIdForRole(dto.role, dto.branchId, {
+      required: true,
+    });
 
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
@@ -134,10 +136,13 @@ export class UsersService {
 
     const isActivating = dto.active === true && user.active === false;
 
-    let branchId: string | null | undefined;
-    if (dto.branchId !== undefined) {
-      branchId = await this.resolveBranchId(dto.branchId);
-    }
+    const nextRole = dto.role ?? user.role;
+    const branchId = await this.resolveBranchIdForUpdate(
+      user.role,
+      nextRole,
+      user.branchId,
+      dto.branchId,
+    );
 
     const updated = await this.usersRepository.update(id, {
       name: dto.name,
@@ -270,6 +275,64 @@ export class UsersService {
     await this.usersRepository.update(id, { updatedById: actor.id });
 
     return toUserResponse(updated);
+  }
+
+  private async resolveBranchIdForRole(
+    role: UserRole,
+    branchId: string | null | undefined,
+    options: { required: boolean },
+  ): Promise<string | null> {
+    if (role === UserRole.ADMIN) {
+      return null;
+    }
+
+    if (role === UserRole.MANAGER || role === UserRole.SELLER) {
+      if (options.required && branchId === undefined) {
+        throw new DomainException(
+          'BRANCH_ASSIGNMENT_REQUIRED',
+          'Gerente e vendedor devem estar vinculados à matriz ou a uma única filial',
+          400,
+        );
+      }
+
+      return this.resolveBranchId(branchId ?? null);
+    }
+
+    return this.resolveBranchId(branchId);
+  }
+
+  private async resolveBranchIdForUpdate(
+    currentRole: UserRole,
+    nextRole: UserRole,
+    currentBranchId: string | null,
+    dtoBranchId: string | null | undefined,
+  ): Promise<string | null | undefined> {
+    if (nextRole === UserRole.ADMIN) {
+      return null;
+    }
+
+    if (nextRole === UserRole.MANAGER || nextRole === UserRole.SELLER) {
+      if (dtoBranchId !== undefined) {
+        return this.resolveBranchId(dtoBranchId);
+      }
+
+      if (
+        currentRole === UserRole.ADMIN &&
+        (nextRole === UserRole.MANAGER || nextRole === UserRole.SELLER)
+      ) {
+        throw new DomainException(
+          'BRANCH_ASSIGNMENT_REQUIRED',
+          'Informe a matriz ou a filial ao alterar o perfil para gerente ou vendedor',
+          400,
+        );
+      }
+
+      return undefined;
+    }
+
+    return dtoBranchId === undefined
+      ? undefined
+      : this.resolveBranchId(dtoBranchId);
   }
 
   private async resolveBranchId(branchId?: string | null): Promise<string | null> {

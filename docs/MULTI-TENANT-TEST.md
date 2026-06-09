@@ -4,8 +4,8 @@ Cada **empresa** é um registro em `tenants` (matriz). Tudo — usuários, veíc
 
 ## Empresas demo (após seed)
 
-| Empresa | CNPJ (login) | Admin |
-|---------|----------------|-------|
+| Empresa | CNPJ | Admin (login: e-mail + senha) |
+|---------|------|-------------------------------|
 | Revenda Demo WPS (Alpha) | `00000000000191` | `admin@revendademo.com.br` / `Admin@123` |
 | Revenda Beta WPS | `11222333000181` | `admin@revendabeta.com.br` / `Admin@123` |
 
@@ -17,10 +17,9 @@ Cada uma já vem com:
 
 ## Como testar
 
-1. Abra o site QA e faça login.
-2. No campo **CNPJ da empresa**, use o CNPJ da tabela.
-3. Cadastre veículos/vendas em uma empresa.
-4. Saia e entre com o **outro CNPJ** — os dados não aparecem (isolamento).
+1. Abra o site QA e faça login com o **e-mail** da tabela (sem CNPJ).
+2. Cadastre veículos/vendas em uma empresa.
+3. Saia e entre com o **e-mail da outra empresa** — os dados não aparecem (isolamento).
 
 ## Criar a segunda empresa no banco
 
@@ -45,6 +44,22 @@ npm run db:seed:beta
 - **Matriz** = o próprio tenant (`/tenants/me`).
 - **Filiais** = `tenant_branches` vinculadas ao mesmo `tenantId`.
 - Cadastro: **Configurações → Filiais**.
+
+## Estoque demo (veículos e produtos)
+
+Após o seed e com a API rodando:
+
+```powershell
+cd apps/api
+npm run start:dev   # outro terminal
+
+npm run import:vehicles:demo -- --dry-run   # simular
+npm run import:vehicles:demo               # Alpha + Beta (6 itens)
+npm run import:vehicles:alpha              # só Alpha (3 itens)
+npm run import:vehicles:beta               # só Beta (3 itens)
+```
+
+Detalhes das colunas do CSV: [IMPORT-VEHICLES.md](./IMPORT-VEHICLES.md).
 
 ## Criar empresa pela API (plataforma)
 

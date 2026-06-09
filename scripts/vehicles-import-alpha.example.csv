@@ -1,0 +1,5 @@
+# Revenda Demo WPS (Alpha) — CNPJ 00000000000191
+tipo,marca,modelo,versao,ano_fabricacao,ano_modelo,placa,renavam,chassi,cor,km,combustivel,cambio,portas,categoria,status,observacoes,valor_compra,data_compra,valor_anunciado
+CAR,Volkswagen,Gol,1.0 MSI,2020,2021,ABC1D23,,,Prata,45000,FLEX,MANUAL,4,HATCH,IN_STOCK,Estoque Alpha - SP,45000.00,2026-05-01,52000.00
+CAR,Fiat,Argo,Drive,2019,2020,XYZ9F87,,,Branco,62000,FLEX,AUTOMATIC,4,HATCH,IN_STOCK,Estoque Alpha - SP,38000.00,2026-05-10,44000.00
+PRODUCT,Bosch,Kit revisao completo,,2026,2026,,,,,,,,,,IN_STOCK,Produto mostruario Alpha,890.50,2026-05-15,1299.90

@@ -23,20 +23,29 @@ export class VehiclesController {
 
   @Get()
   @Permissions('vehicles:read')
-  findAll(@Query() query: ListVehiclesQueryDto) {
-    return this.vehiclesService.findAll(query);
+  findAll(
+    @Query() query: ListVehiclesQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.vehiclesService.findAll(query, actor);
   }
 
   @Get('plate/:plate')
   @Permissions('vehicles:read')
-  findByPlate(@Param('plate') plate: string) {
-    return this.vehiclesService.findByPlate(plate);
+  findByPlate(
+    @Param('plate') plate: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.vehiclesService.findByPlate(plate, actor);
   }
 
   @Get(':id')
   @Permissions('vehicles:read')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.vehiclesService.findById(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.vehiclesService.findById(id, actor);
   }
 
   @Post()

@@ -14,8 +14,11 @@ export class DashboardsController {
   @Get('manager')
   @Permissions('dashboard:read')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  manager(@Query() query: DashboardQueryDto) {
-    return this.dashboardsService.getManagerDashboard(query);
+  manager(
+    @Query() query: DashboardQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.dashboardsService.getManagerDashboard(actor, query);
   }
 
   @Get('seller')
@@ -30,7 +33,10 @@ export class DashboardsController {
   @Get('seller/ranking')
   @Permissions('dashboard:read')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  sellerRanking(@Query() query: DashboardQueryDto) {
-    return this.dashboardsService.getSellerRanking(query);
+  sellerRanking(
+    @Query() query: DashboardQueryDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.dashboardsService.getSellerRanking(actor, query);
   }
 }

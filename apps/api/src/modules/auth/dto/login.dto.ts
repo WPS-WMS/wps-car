@@ -9,7 +9,7 @@ export class LoginDto {
   @MinLength(6)
   password!: string;
 
-  /** CNPJ da revenda — obrigatório para usuários de tenant */
+  /** CNPJ da revenda — opcional; sem ele, a empresa é resolvida pelo e-mail do usuário */
   @IsOptional()
   @IsString()
   tenantCnpj?: string;

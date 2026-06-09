@@ -9,10 +9,12 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "start:render": "bash scripts/render-start.sh",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "db:unlock": "prisma db execute --file scripts/release-migration-lock.sql --schema prisma/schema.prisma",
     "prisma:studio": "prisma studio",
     "prisma:validate": "prisma validate",
     "db:push": "prisma db push",
@@ -20,7 +22,10 @@
     "db:seed:beta": "ts-node --project tsconfig.scripts.json scripts/seed-beta-tenant.ts",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:e2e:vehicles": "jest --config ./test/jest-e2e.json --runInBand vehicles-create",
-    "import:vehicles": "ts-node --project tsconfig.scripts.json scripts/bulk-import-vehicles.ts"
+    "import:vehicles": "ts-node --project tsconfig.scripts.json scripts/bulk-import-vehicles.ts",
+    "import:vehicles:alpha": "ts-node --project tsconfig.scripts.json scripts/bulk-import-vehicles.ts -- --file=../../scripts/vehicles-import-alpha.example.csv --tenant=alpha",
+    "import:vehicles:beta": "ts-node --project tsconfig.scripts.json scripts/bulk-import-vehicles.ts -- --file=../../scripts/vehicles-import-beta.example.csv --tenant=beta",
+    "import:vehicles:demo": "ts-node --project tsconfig.scripts.json scripts/bulk-import-vehicles.ts -- --file=../../scripts/vehicles-import-demo.csv --tenant=all"
   },
   "prisma": {
     "seed": "ts-node --project tsconfig.scripts.json prisma/seed.ts"

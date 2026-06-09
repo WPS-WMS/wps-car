@@ -25,6 +25,7 @@ import {
 import { BranchAssignmentField } from '@/components/users/branch-assignment-field';
 import { FormField, FormNativeSelect, FormTextarea } from '@/components/vehicles/form-field';
 import { branchIdToPayload, userBranchLabel } from '@/hooks/use-tenant-branch-options';
+import { requiresBranchAssignment } from '@/lib/user-branch-rules';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -147,10 +148,13 @@ export function UserCreateCard({
         email: values.email.trim(),
         password: values.password,
         role: values.role,
-        branchId: branchIdToPayload(values.branchId),
         phone: values.phone?.trim() || undefined,
         address: values.address?.trim() || undefined,
       };
+
+      if (requiresBranchAssignment(values.role)) {
+        payload.branchId = branchIdToPayload(values.branchId);
+      }
 
       if (values.role === 'SELLER' && values.commissionType) {
         payload.commissionType = values.commissionType;
@@ -211,10 +215,12 @@ export function UserCreateCard({
         name: values.name.trim(),
         email: values.email.trim(),
         role: values.role,
-        branchId: branchIdToPayload(values.branchId),
         phone: values.phone?.trim() || undefined,
         address: values.address?.trim() || undefined,
       };
+      if (requiresBranchAssignment(values.role)) {
+        payload.branchId = branchIdToPayload(values.branchId);
+      }
       if (values.role === 'SELLER' && values.commissionType) {
         payload.commissionType = values.commissionType;
         if (values.commissionType !== 'CUSTOM_PER_VEHICLE') {
@@ -387,20 +393,29 @@ export function UserCreateCard({
                       label="Tipo de usuário"
                       required
                       value={role}
-                      onChange={(v) =>
-                        setValue('role', v as Values['role'], { shouldValidate: true })
-                      }
+                      onChange={(v) => {
+                        setValue('role', v as Values['role'], { shouldValidate: true });
+                        if (v === 'ADMIN') {
+                          setValue('branchId', '', { shouldValidate: true });
+                        }
+                      }}
                       options={roles as unknown as { value: string; label: string }[]}
                       error={errors.role?.message}
                     />
 
-                    <BranchAssignmentField
-                      value={watch('branchId') ?? ''}
-                      onChange={(v) =>
-                        setValue('branchId', v, { shouldValidate: true, shouldDirty: true })
-                      }
-                      error={errors.branchId?.message}
-                    />
+                    {requiresBranchAssignment(role) ? (
+                      <BranchAssignmentField
+                        value={watch('branchId') ?? ''}
+                        onChange={(v) =>
+                          setValue('branchId', v, { shouldValidate: true, shouldDirty: true })
+                        }
+                        error={errors.branchId?.message}
+                      />
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Administrador fica sempre na matriz (visão de toda a empresa).
+                      </p>
+                    )}
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <FormField label="Telefone" error={errors.phone?.message}>
@@ -610,26 +625,37 @@ export function UserCreateCard({
               label="Tipo de usuário"
               required
               value={editRole ?? 'SELLER'}
-              onChange={(v) => setValueEdit('role', v as any, { shouldValidate: true })}
+              onChange={(v) => {
+                setValueEdit('role', v as any, { shouldValidate: true });
+                if (v === 'ADMIN') {
+                  setValueEdit('branchId', '', { shouldValidate: true });
+                }
+              }}
               options={roles as unknown as { value: string; label: string }[]}
               error={editErrors.role?.message}
             />
 
-            <BranchAssignmentField
-              value={watchEdit('branchId') ?? ''}
-              onChange={(v) =>
-                setValueEdit('branchId', v, { shouldValidate: true, shouldDirty: true })
-              }
-              error={editErrors.branchId?.message}
-              currentBranch={
-                selectedUser?.branchId
-                  ? {
-                      id: selectedUser.branchId,
-                      name: selectedUser.branchName ?? 'Filial',
-                    }
-                  : null
-              }
-            />
+            {requiresBranchAssignment(editRole ?? 'SELLER') ? (
+              <BranchAssignmentField
+                value={watchEdit('branchId') ?? ''}
+                onChange={(v) =>
+                  setValueEdit('branchId', v, { shouldValidate: true, shouldDirty: true })
+                }
+                error={editErrors.branchId?.message}
+                currentBranch={
+                  selectedUser?.branchId
+                    ? {
+                        id: selectedUser.branchId,
+                        name: selectedUser.branchName ?? 'Filial',
+                      }
+                    : null
+                }
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Administrador fica sempre na matriz (visão de toda a empresa).
+              </p>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Telefone" error={editErrors.phone?.message}>

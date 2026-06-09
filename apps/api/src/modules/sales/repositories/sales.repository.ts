@@ -37,12 +37,11 @@ export class SalesRepository extends TenantScopedRepository {
 
   buildWhere(
     query: ListSalesQueryDto,
-    options?: { sellerId?: string },
+    saleScope: Prisma.SaleWhereInput = {},
   ): Prisma.SaleWhereInput {
     return {
       tenantId: this.tenantId(),
-      ...(options?.sellerId && { sellerId: options.sellerId }),
-      ...(query.sellerId && { sellerId: query.sellerId }),
+      ...saleScope,
       ...(query.status && { status: query.status }),
       ...(query.vehicleId && { vehicleId: query.vehicleId }),
       ...(query.customerId && { customerId: query.customerId }),
@@ -64,9 +63,12 @@ export class SalesRepository extends TenantScopedRepository {
     };
   }
 
-  async findManyPaginated(query: ListSalesQueryDto, options?: { sellerId?: string }) {
+  async findManyPaginated(
+    query: ListSalesQueryDto,
+    saleScope: Prisma.SaleWhereInput = {},
+  ) {
     const { page, limit, skip, orderBy } = resolvePagination(query);
-    const where = this.buildWhere(query, options);
+    const where = this.buildWhere(query, saleScope);
 
     const [data, total] = await Promise.all([
       this.prisma.sale.findMany({
@@ -170,12 +172,14 @@ export class SalesRepository extends TenantScopedRepository {
     return date;
   }
 
-  async getCommissionReport(query: CommissionReportQueryDto, sellerId?: string) {
+  async getCommissionReport(
+    query: CommissionReportQueryDto,
+    saleScope: Prisma.SaleWhereInput = {},
+  ) {
     const endDate = this.normalizeEndDate(query.endDate);
     const where: Prisma.SaleWhereInput = {
       tenantId: this.tenantId(),
-      ...(sellerId && { sellerId }),
-      ...(query.sellerId && { sellerId: query.sellerId }),
+      ...saleScope,
       ...(query.status && { status: query.status }),
       ...(query.startDate || endDate
         ? {

@@ -23,6 +23,12 @@ import {
   type PeriodFilterValue,
 } from '@/lib/date-period';
 import { useAuth } from '@/providers/auth-provider';
+import {
+  AnalyticsScopeFilter,
+  analyticsScopeParams,
+  emptyAnalyticsScope,
+  scopeQueryKey,
+} from '@/components/analytics/analytics-scope-filter';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { SellerRankingTable } from '@/components/dashboard/seller-ranking-table';
 import { VehicleListCard } from '@/components/vehicles/vehicle-list-card';
@@ -31,8 +37,9 @@ import { SalesPeriodFilter } from '@/components/sales/sales-period-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function DashboardPage() {
-  const { isManager } = useAuth();
+  const { isManager, isAdmin } = useAuth();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(defaultPeriodFilter);
+  const [scope, setScope] = useState(emptyAnalyticsScope);
 
   const periodRange = useMemo(
     () => resolvePeriodRange(periodFilter),
@@ -43,18 +50,20 @@ export default function DashboardPage() {
     ? { startDate: periodRange.startDate, endDate: periodRange.endDate }
     : undefined;
 
+  const scopeParams = analyticsScopeParams(scope, isAdmin);
+
   const metricTitles = periodMetricTitles(periodFilter.preset);
   const periodDescription = formatPeriodDescription(periodFilter, periodRange);
 
   const manager = useQuery({
-    queryKey: ['dashboard', 'manager', periodParams],
-    queryFn: () => api.getManagerDashboard(periodParams),
+    queryKey: ['dashboard', 'manager', periodParams, scopeQueryKey(scope)],
+    queryFn: () => api.getManagerDashboard({ ...periodParams, ...scopeParams }),
     enabled: isManager,
   });
 
   const ranking = useQuery({
-    queryKey: ['dashboard', 'seller-ranking', periodParams],
-    queryFn: () => api.getSellerRanking(periodParams),
+    queryKey: ['dashboard', 'seller-ranking', periodParams, scopeQueryKey(scope)],
+    queryFn: () => api.getSellerRanking({ ...periodParams, ...scopeParams }),
     enabled: isManager,
   });
 
@@ -84,11 +93,16 @@ export default function DashboardPage() {
         }
       />
 
-      <SalesPeriodFilter
-        value={periodFilter}
-        onChange={setPeriodFilter}
-        description={periodDescription}
-      />
+      <div className="space-y-4">
+        <SalesPeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          description={periodDescription}
+        />
+        {isManager ? (
+          <AnalyticsScopeFilter value={scope} onChange={setScope} />
+        ) : null}
+      </div>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Carregando métricas…</p>

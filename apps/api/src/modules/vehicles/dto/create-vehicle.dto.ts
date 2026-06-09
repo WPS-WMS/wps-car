@@ -115,4 +115,9 @@ export class CreateVehicleDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   listedValue?: number;
+
+  /** Admin: filial do veículo (`matriz` ou id da filial). Gerente/vendedor ignoram. */
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

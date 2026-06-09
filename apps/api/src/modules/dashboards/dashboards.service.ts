@@ -1,16 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { DataScopeService } from '../../infrastructure/scope/data-scope.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { DashboardsRepository } from './dashboards.repository';
 
 @Injectable()
 export class DashboardsService {
-  constructor(private readonly repository: DashboardsRepository) {}
+  constructor(
+    private readonly repository: DashboardsRepository,
+    private readonly dataScope: DataScopeService,
+  ) {}
 
-  async getManagerDashboard(query: DashboardQueryDto) {
+  async getManagerDashboard(actor: AuthenticatedUser, query: DashboardQueryDto) {
+    const saleScope = await this.dataScope.buildSaleScope(actor, {
+      branchId: query.branchId,
+      sellerId: query.sellerId,
+    });
+
     const [stock, sales] = await Promise.all([
       this.repository.getStockMetrics(),
-      this.repository.getSalesMetrics(query.startDate, query.endDate),
+      this.repository.getSalesMetrics(query.startDate, query.endDate, saleScope),
     ]);
 
     return {
@@ -55,10 +64,16 @@ export class DashboardsService {
     };
   }
 
-  async getSellerRanking(query: DashboardQueryDto) {
+  async getSellerRanking(actor: AuthenticatedUser, query: DashboardQueryDto) {
+    const saleScope = await this.dataScope.buildSaleScope(actor, {
+      branchId: query.branchId,
+      sellerId: query.sellerId,
+    });
+
     const ranking = await this.repository.getSellerRanking(
       query.startDate,
       query.endDate,
+      saleScope,
     );
 
     return {
