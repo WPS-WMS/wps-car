@@ -14,10 +14,16 @@ import {
 import { TenantBranchesController } from './tenant-branches.controller';
 import { TenantBranchesService } from './tenant-branches.service';
 import { TenantBranchesRepository } from './repositories/tenant-branches.repository';
+import { ProfileAccessController } from './profile-access.controller';
+import { ProfileAccessService } from './profile-access.service';
+import { EmailNotificationsController } from './email-notifications.controller';
+import { EmailNotificationsService } from './email-notifications.service';
 
 @Module({
   controllers: [
     TenantSettingsController,
+    ProfileAccessController,
+    EmailNotificationsController,
     VehicleTypesConfigController,
     CostTypesConfigController,
     PaymentMethodsConfigController,
@@ -32,7 +38,15 @@ import { TenantBranchesRepository } from './repositories/tenant-branches.reposit
     ConfigCatalogRepository,
     TenantBranchesService,
     TenantBranchesRepository,
+    ProfileAccessService,
+    EmailNotificationsService,
   ],
-  exports: [TenantSettingsService, ConfigCatalogService, TenantBranchesService],
+  exports: [
+    TenantSettingsService,
+    ConfigCatalogService,
+    TenantBranchesService,
+    ProfileAccessService,
+    EmailNotificationsService,
+  ],
 })
 export class SettingsModule {}

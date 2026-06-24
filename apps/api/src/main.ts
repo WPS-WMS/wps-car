@@ -2,7 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -14,13 +14,16 @@ async function bootstrap() {
   const port = config.get<number>('port') ?? 3001;
   const apiPrefix = config.get<string>('apiPrefix') ?? 'api/v1';
   const corsOrigin = config.get<string>('corsOrigin') ?? 'http://localhost:3000';
-  const uploadDir = config.get<string>('upload.dir') ?? './uploads';
   const corsOrigins = corsOrigin
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
 
-  app.useStaticAssets(join(process.cwd(), uploadDir), { prefix: '/uploads' });
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   app.setGlobalPrefix(apiPrefix);
   app.enableCors({ origin: corsOrigins, credentials: true });

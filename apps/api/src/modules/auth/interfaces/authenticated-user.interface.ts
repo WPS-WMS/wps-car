@@ -15,5 +15,6 @@ export interface JwtPayload {
   email: string;
   role: UserRole;
   tenantId: string | null;
-  type: 'access' | 'refresh';
+  tokenVersion?: number;
+  type: 'access' | 'refresh' | '2fa_pending';
 }

@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { StockMovementType, VehicleStatus } from '@prisma/client';
 import { DomainException } from '../../domain/exceptions/domain.exception';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
+import {
+  isValidLicensePlate,
+  normalizeLicensePlate,
+} from '../../common/utils/license-plate.util';
+import { toPlateLookupResponse } from '../../common/mappers/plate-lookup.mapper';
 import { toStockItemResponse } from '../../common/mappers/vehicle.mapper';
 import { toStockMovementResponse } from '../../common/mappers/stock.mapper';
 import { DataScopeService } from '../../infrastructure/scope/data-scope.service';
@@ -47,6 +52,41 @@ export class StockService {
       page,
       limit,
     );
+  }
+
+  async lookupByPlate(licensePlate: string, actor: AuthenticatedUser) {
+    if (!isValidLicensePlate(licensePlate)) {
+      throw new DomainException('INVALID_LICENSE_PLATE', 'Placa inválida', 400);
+    }
+
+    const normalized = normalizeLicensePlate(licensePlate);
+    const vehicle = await this.vehiclesRepository.findByLicensePlate(normalized, true);
+
+    if (!vehicle) {
+      return toPlateLookupResponse({
+        plate: normalized,
+        vehicle: null,
+        sales: [],
+        costs: [],
+        movements: [],
+      });
+    }
+
+    this.dataScope.assertVehicleAccess(vehicle, actor);
+
+    const [sales, costs, movements] = await Promise.all([
+      this.stockRepository.findSalesByVehicle(vehicle.id),
+      this.stockRepository.findCostsByVehicle(vehicle.id),
+      this.stockRepository.findMovementsByVehicle(vehicle.id),
+    ]);
+
+    return toPlateLookupResponse({
+      plate: normalized,
+      vehicle,
+      sales,
+      costs,
+      movements,
+    });
   }
 
   async findByPlate(licensePlate: string, actor: AuthenticatedUser) {

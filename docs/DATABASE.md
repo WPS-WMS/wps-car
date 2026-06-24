@@ -47,13 +47,19 @@ O WPS Car modela um **SaaS para revendas de veículos** (e produtos de estoque, 
 
 | Pasta | Descrição |
 |-------|-----------|
-| `20260519231905_init` | Criação inicial de todas as tabelas, enums e índices |
-| `20260520120000_add_vehicle_type_product` | Adiciona valor `PRODUCT` ao enum `VehicleType` |
-
-Verificar status:
+| `20260519231905_init` | Schema inicial |
+| `20260520120000_add_vehicle_type_product` | Enum `VehicleType.PRODUCT` |
+| `20260521120000_extend_vehicle_cost_types` | Novos tipos de custo |
+| `20260528100000_add_seller_commission_rule_and_user_contact` | Comissão por vendedor, contato usuário |
+| `20260604120000_add_tenant_branches` | Filiais (`tenant_branches`) |
+| `20260605120000_add_user_branch` | `users.branch_id` |
+| `20260608140000_add_vehicle_branch` | `vehicles.branch_id` |
+| `20260608160000_add_password_reset_tokens` | Recuperação de senha |
 
 ```powershell
 cd apps/api
+npm run prisma:migrate:deploy   # local (.env.local)
+npm run prisma:migrate:deploy:qa
 npx prisma migrate status
 ```
 
@@ -70,7 +76,13 @@ erDiagram
   tenants ||--o{ sales : possui
   tenants ||--o{ commission_rules : possui
 
+  tenants ||--o{ tenant_branches : possui
+  tenant_branches ||--o{ users : filial
+  tenant_branches ||--o{ vehicles : filial
+
   users ||--o{ refresh_tokens : possui
+  users ||--o{ password_reset_tokens : possui
+  users ||--o| seller_commission_rules : possui
   users ||--o{ user_permissions : possui
 
   permissions ||--o{ role_permissions : possui
@@ -126,7 +138,7 @@ erDiagram
 
 | Enum | Valores |
 |------|---------|
-| `VehicleCostType` | PAINTING, MECHANICS, BODYWORK, SANITIZATION, DOCUMENTATION, TRANSPORT, REVISION, OTHER |
+| `VehicleCostType` | PAINTING, MECHANICS, BODYWORK, SANITIZATION, DOCUMENTATION, DISPATCHER, TRANSPORT, TOWING, ADVERTISING, COMMISSION, WASHING, REVISION, OTHER |
 | `SaleStatus` | NEGOTIATION, SOLD, CANCELLED, AWAITING_PAYMENT, COMPLETED |
 | `PaymentMethod` | CASH, BANK_TRANSFER, PIX, CREDIT_CARD, DEBIT_CARD, FINANCING, CHECK, TRADE_IN, OTHER |
 | `CommissionRuleType` | SALE_PERCENTAGE, PROFIT_PERCENTAGE, FIXED_AMOUNT, CUSTOM_PER_VEHICLE |
@@ -171,7 +183,12 @@ Convenção: nomes no PostgreSQL em **snake_case** (`@@map` no Prisma). PKs são
 | email | text | sim | Único por tenant |
 | password_hash | text | sim | bcrypt |
 | role | UserRole | sim | |
+| phone | text | não | Telefone |
+| address | text | não | Endereço |
+| branch_id | uuid | não | FK → tenant_branches; null = matriz |
 | active | boolean | sim | Default true |
+| deactivated_at | timestamp | não | Desativação |
+| deactivation_reason | text | não | Motivo |
 | created_at, updated_at | timestamp | sim | |
 | created_by_id, updated_by_id | uuid | não | FK → users |
 
@@ -189,6 +206,19 @@ Convenção: nomes no PostgreSQL em **snake_case** (`@@map` no Prisma). PKs são
 | token_hash | text | Hash do refresh token |
 | expires_at | timestamp | |
 | revoked_at | timestamp | Logout / revogação |
+| created_at | timestamp | |
+
+---
+
+### `password_reset_tokens` — Recuperação de senha
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | uuid | PK |
+| user_id | uuid | FK → users |
+| token_hash | text | Hash do token enviado por e-mail |
+| expires_at | timestamp | Validade |
+| used_at | timestamp | Preenchido após redefinição |
 | created_at | timestamp | |
 
 ---
@@ -251,6 +281,7 @@ Convenção: nomes no PostgreSQL em **snake_case** (`@@map` no Prisma). PKs são
 | doors | int | não | |
 | category | VehicleCategory | não | |
 | status | VehicleStatus | sim | Default IN_STOCK |
+| branch_id | uuid | não | FK → tenant_branches |
 | notes | text | não | Observações |
 | created_at, updated_at | timestamp | sim | |
 | created_by_id, updated_by_id | uuid | não | FK → users |
@@ -403,7 +434,8 @@ Estrutura análoga a `customer_history`.
 ---
 
 ### `sales` — Vendas
- 
+
+| Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | id | uuid | PK |
 | tenant_id | uuid | FK → tenants |
@@ -414,9 +446,9 @@ Estrutura análoga a `customer_history`.
 | payment_method | PaymentMethod | |
 | sale_date | timestamp | |
 | status | SaleStatus | Default NEGOTIATION |
-| commission | decimal(14,2) | |
+| commission | decimal(14,2) | Snapshot congelado após SOLD/COMPLETED |
 | notes | text | |
-| Auditoria | | |
+| created_at, updated_at, created_by_id, updated_by_id | | |
 
 ---
 
@@ -464,11 +496,42 @@ Estrutura análoga a `customer_history`.
 
 ---
 
+### `seller_commission_rules` — Comissão padrão por vendedor
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | uuid | PK |
+| tenant_id | uuid | FK → tenants |
+| seller_id | uuid | FK → users, **único** |
+| type | CommissionRuleType | |
+| value | decimal(14,4) | % ou valor fixo |
+| active | boolean | Default true |
+| created_at, updated_at | timestamp | |
+
+---
+
+### `tenant_branches` — Filiais da empresa
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | uuid | PK |
+| tenant_id | uuid | FK → tenants |
+| name | text | Nome da filial |
+| address | text | Endereço |
+| phone | text | Telefone |
+| active | boolean | Default true |
+| sort_order | int | Ordem na UI |
+| created_at, updated_at | timestamp | |
+
+Usuários e veículos podem referenciar `branch_id`; null indica matriz.
+
+---
+
 ### Configurações do tenant
 
 | Tabela | Descrição |
 |--------|-----------|
-| `tenant_settings` | Pares `key` + `value` (JSON); ex.: margens padrão |
+| `tenant_settings` | Pares `key` + `value` (JSON); ex.: margens padrão, `profile_access` (menu por perfil) |
 | `config_vehicle_types` | Tipos de veículo customizáveis (UI) |
 | `config_cost_types` | Tipos de custo customizáveis |
 | `config_payment_methods` | Formas de pagamento |
@@ -530,8 +593,11 @@ Executar:
 
 ```powershell
 cd apps/api
-npx prisma db seed
+npm run db:seed          # local
+npm run db:seed:qa       # Neon QA
 ```
+
+Variáveis: `apps/api/.env.local` ou `.env.qa` — ver [ENV.md](./ENV.md).
 
 ### Empresa demo
 
@@ -542,16 +608,17 @@ npx prisma db seed
 | Status | ACTIVE |
 | Plano | PROFESSIONAL |
 
-### Usuários (login com CNPJ da empresa no front)
+### Usuários (login: e-mail + senha na web)
 
 | Perfil | E-mail | Senha |
 |--------|--------|-------|
-| Admin | admin@revendademo.com.br | Admin@123 |
-| Gerente | gerente@revendademo.com.br | Manager@123 |
-| Vendedor | vendedor@revendademo.com.br | Seller@123 |
-| Moderador (plataforma) | moderator@wpscar.com.br | Moderator@123 |
+| Admin Alpha | admin@revendademo.com.br | Admin@123 |
+| Gerente Alpha | gerente@revendademo.com.br | Manager@123 |
+| Vendedor Alpha | vendedor@revendademo.com.br | Seller@123 |
+| Admin Beta | admin@revendabeta.com.br | Admin@123 |
+| Moderador | moderator@wpscar.com.br | Moderator@123 |
 
-O seed também cria permissões, configurações padrão do tenant e regra de comissão padrão (2% sobre venda).
+O seed cria duas empresas (Alpha + Beta), filiais, permissões, templates de e-mail e regra de comissão padrão.
 
 ---
 
@@ -576,15 +643,14 @@ npx prisma migrate deploy
 npx prisma migrate reset
 ```
 
-Variável de ambiente: `DATABASE_URL` em `apps/api/.env` (ver `.env.example` na raiz).
-
----
+Variável de ambiente: `DATABASE_URL` em `apps/api/.env.local` (ver `.env.local.example`).
 
 ## Documentação relacionada
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — multi-tenant e camadas da API
-- [API-VEHICLES-STOCK.md](./API-VEHICLES-STOCK.md) — endpoints de veículos e estoque
-- [SETUP-POSTGRES-WINDOWS.md](./SETUP-POSTGRES-WINDOWS.md) — instalação do PostgreSQL
+- [ONBOARDING.md](./ONBOARDING.md)
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [ENV.md](./ENV.md)
+- [API-VEHICLES-STOCK.md](./API-VEHICLES-STOCK.md)
 
 ---
 

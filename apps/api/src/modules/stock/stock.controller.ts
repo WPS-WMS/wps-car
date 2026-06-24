@@ -20,13 +20,22 @@ export class StockController {
     return this.stockService.listInventory(query, actor);
   }
 
+  @Get('plate/:plate/lookup')
+  @Permissions('stock:read')
+  lookupByPlate(
+    @Param('plate') plate: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.stockService.lookupByPlate(decodeURIComponent(plate), actor);
+  }
+
   @Get('plate/:plate')
   @Permissions('stock:read')
   findByPlate(
     @Param('plate') plate: string,
     @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.stockService.findByPlate(plate, actor);
+    return this.stockService.findByPlate(decodeURIComponent(plate), actor);
   }
 
   @Get('movements')

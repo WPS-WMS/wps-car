@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DomainException } from '../../domain/exceptions/domain.exception';
+import { isEmailNotificationType } from './constants/email-notification-types';
 import { CreateCatalogItemDto } from './dto/create-catalog-item.dto';
 import { UpdateCatalogItemDto } from './dto/update-catalog-item.dto';
 import { CreateStatusConfigDto } from './dto/create-status-config.dto';
@@ -145,6 +146,14 @@ export class ConfigCatalogService {
   }
 
   async createEmailTemplate(dto: CreateEmailTemplateDto) {
+    if (!isEmailNotificationType(dto.code.toLowerCase())) {
+      throw new DomainException(
+        'INVALID_EMAIL_NOTIFICATION_TYPE',
+        'Use um tipo de e-mail válido ou a rota /settings/email-notifications/:code',
+        400,
+      );
+    }
+
     try {
       return await this.repository.createEmailTemplate({
         code: dto.code.toLowerCase(),

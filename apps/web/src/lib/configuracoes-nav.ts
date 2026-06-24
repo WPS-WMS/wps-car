@@ -7,16 +7,23 @@ import {
   Mail,
   Percent,
   Tag,
+  Truck,
   UserCog,
+  UserRound,
   Users,
   Wallet,
+  ShieldCheck,
 } from 'lucide-react';
+import type { AuthUser } from '@/types/api';
+import { hasPermission } from '@/lib/permissions';
 
 export type ConfigCardItem = {
   href: string;
   title: string;
   description: string;
   icon: LucideIcon;
+  /** Permissão necessária para ver o card; omitido = settings:read */
+  permission?: string;
 };
 
 export const configuracoesCards: ConfigCardItem[] = [
@@ -27,10 +34,38 @@ export const configuracoesCards: ConfigCardItem[] = [
     icon: Building2,
   },
   {
+    href: '/clientes',
+    title: 'Clientes',
+    description: 'Cadastro de clientes compradores',
+    icon: UserRound,
+    permission: 'customers:read',
+  },
+  {
+    href: '/fornecedores',
+    title: 'Fornecedores',
+    description: 'Cadastro de fornecedores e parceiros',
+    icon: Truck,
+    permission: 'suppliers:read',
+  },
+  {
     href: '/configuracoes/usuarios',
     title: 'Usuários',
     description: 'Gerencie usuários, perfis e acessos da revenda',
     icon: Users,
+  },
+  {
+    href: '/configuracoes/seguranca',
+    title: 'Segurança',
+    description: 'Autenticação em duas etapas para administradores',
+    icon: ShieldCheck,
+    permission: 'settings:read',
+  },
+  {
+    href: '/configuracoes/gestao-perfil',
+    title: 'Gestão de perfil',
+    description: 'Controle quais itens do menu lateral Gerente e Vendedor podem acessar',
+    icon: ShieldCheck,
+    permission: 'settings:update',
   },
   {
     href: '/configuracoes/tipos-veiculo',
@@ -83,7 +118,18 @@ export const configuracoesCards: ConfigCardItem[] = [
   {
     href: '/configuracoes/emails',
     title: 'E-mails de notificação',
-    description: 'E-mail de envio e templates de mensagens',
+    description: 'Configure o envio automático por tipo de e-mail da revenda',
     icon: Mail,
   },
 ];
+
+export function getVisibleConfiguracoesCards(user: AuthUser | null | undefined) {
+  const authUser = user ?? null;
+  return configuracoesCards.filter((item) =>
+    hasPermission(authUser, item.permission ?? 'settings:read'),
+  );
+}
+
+export function canAccessConfiguracoes(user: AuthUser | null | undefined) {
+  return getVisibleConfiguracoesCards(user).length > 0;
+}

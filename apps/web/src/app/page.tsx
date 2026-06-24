@@ -3,13 +3,18 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { getAccessToken } from '@/lib/auth-storage';
+import { getAccessToken, getStoredUser } from '@/lib/auth-storage';
 
 export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(getAccessToken() ? '/dashboard' : '/login');
+    if (!getAccessToken()) {
+      router.replace('/login');
+      return;
+    }
+    const role = getStoredUser()?.role;
+    router.replace(role === 'MODERATOR' ? '/plataforma' : '/dashboard');
   }, [router]);
 
   return (

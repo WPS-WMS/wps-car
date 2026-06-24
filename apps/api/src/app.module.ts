@@ -1,8 +1,10 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
+import { resolveApiEnvFilePath } from './config/resolve-env-files';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -29,20 +31,39 @@ import { CommissionsModule } from './modules/commissions/commissions.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { PlatformModule } from './modules/platform/platform.module';
+import { PurchaseIntelligenceModule } from './modules/purchase-intelligence/purchase-intelligence.module';
+import { PricingIntelligenceModule } from './modules/pricing-intelligence/pricing-intelligence.module';
+import { CrmModule } from './modules/crm/crm.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { MailModule } from './infrastructure/mail/mail.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
+import { FilesModule } from './modules/files/files.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { CacheModule } from './infrastructure/cache/cache.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: 120 },
+      { name: 'auth', ttl: 60_000, limit: 15 },
+    ]),
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: resolveApiEnvFilePath(),
       load: [configuration],
       validate: validateEnv,
     }),
+    CacheModule,
+    AuditModule,
     AuthModule,
     PrismaModule,
     TenantModule,
+    MailModule,
+    NotificationsModule,
     HealthModule,
     StorageModule,
+    FilesModule,
     TenantsModule,
     UsersModule,
     VehiclesModule,
@@ -56,6 +77,10 @@ import { StorageModule } from './infrastructure/storage/storage.module';
     SettingsModule,
     DashboardsModule,
     ReportsModule,
+    PlatformModule,
+    PurchaseIntelligenceModule,
+    PricingIntelligenceModule,
+    CrmModule,
   ],
   providers: [
     TenantContextInterceptor,
@@ -63,6 +88,7 @@ import { StorageModule } from './infrastructure/storage/storage.module';
     RolesGuard,
     PermissionsGuard,
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useExisting: JwtAuthGuard },
     { provide: APP_GUARD, useExisting: TenantGuard },
     { provide: APP_GUARD, useExisting: RolesGuard },

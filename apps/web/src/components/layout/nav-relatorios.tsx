@@ -3,25 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ChevronDown, LayoutDashboard, Percent } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
-
-const items = [
-  {
-    href: '/relatorios/geral',
-    label: 'Relatório geral',
-    icon: LayoutDashboard,
-    permission: 'reports:read',
-  },
-  {
-    href: '/relatorios/comissoes',
-    label: 'Relatório de comissão',
-    icon: Percent,
-    permission: 'commissions:read',
-  },
-] as const;
+import { RELATORIOS_NAV_ITEMS, RELATORIOS_NAV_META } from '@/lib/sidebar-nav';
 
 export function NavRelatorios({
   navLinkClass,
@@ -30,9 +16,12 @@ export function NavRelatorios({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const visible = items.filter((item) => hasPermission(user, item.permission));
+  const visible = RELATORIOS_NAV_ITEMS.filter((item) =>
+    hasPermission(user, item.permission),
+  );
   const isActive = pathname.startsWith('/relatorios');
   const [open, setOpen] = useState(isActive);
+  const MetaIcon = RELATORIOS_NAV_META.icon;
 
   if (!visible.length) return null;
 
@@ -43,8 +32,8 @@ export function NavRelatorios({
         onClick={() => setOpen((v) => !v)}
         className={navLinkClass(isActive)}
       >
-        <BarChart3 className="h-4 w-4 shrink-0" />
-        <span className="flex-1 text-left">Relatórios</span>
+        <MetaIcon className="h-4 w-4 shrink-0" />
+        <span className="flex-1 text-left">{RELATORIOS_NAV_META.label}</span>
         <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
       </button>
       {open ? (
@@ -74,4 +63,3 @@ export function NavRelatorios({
     </div>
   );
 }
-

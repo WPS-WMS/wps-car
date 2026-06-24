@@ -14,6 +14,14 @@ export class TenantContextService {
     return this.storage.run({ tenantId: null, userId: null }, callback);
   }
 
+  runWithTenant<T>(
+    tenantId: string,
+    userId: string,
+    callback: () => T | Promise<T>,
+  ): T | Promise<T> {
+    return this.storage.run({ tenantId, userId }, callback);
+  }
+
   private store(): TenantStore {
     const store = this.storage.getStore();
 

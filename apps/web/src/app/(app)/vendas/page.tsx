@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ShoppingCart, DollarSign, TrendingUp, Pencil } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/format';
@@ -28,6 +29,7 @@ import { SaleEditDialog } from '@/components/sales/sale-edit-dialog';
 import { SalesPeriodFilter } from '@/components/sales/sales-period-filter';
 import { ExportButtons } from '@/components/reports/export-buttons';
 import { PageHeader } from '@/components/layout/page-header';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { SearchBar } from '@/components/ui/search-bar';
 import { SelectField } from '@/components/ui/select-field';
@@ -46,6 +48,7 @@ export default function VendasPage() {
   const [scope, setScope] = useState(emptyAnalyticsScope);
   const canRead = hasPermission(user, 'sales:read');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [editSaleId, setEditSaleId] = useState<string | null>(null);
@@ -81,12 +84,12 @@ export default function VendasPage() {
     (isManager ? managerDash.isFetching : sellerDash.isFetching) && !!periodRange;
 
   const query = useQuery({
-    queryKey: ['sales', { search, status, page, ...scopeQueryKey(scope) }],
+    queryKey: ['sales', { search: debouncedSearch, status, page, ...scopeQueryKey(scope) }],
     queryFn: () =>
       api.getSales({
         page,
         limit: 20,
-        ...(search ? { search } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
         ...(status ? { status } : {}),
         ...scopeParams,
       }),
@@ -272,31 +275,11 @@ export default function VendasPage() {
               </div>
             </Card>
 
-            {meta && meta.totalPages > 1 ? (
-              <div className="mt-4 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Página {meta.page} de {meta.totalPages} ({meta.total} itens)
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!meta.hasPreviousPage}
-                    onClick={() => setPage((p) => p - 1)}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!meta.hasNextPage}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Próxima
-                  </Button>
-                </div>
-              </div>
-            ) : null}
+            <PaginationControls
+              className="mt-4"
+              meta={meta}
+              onPageChange={setPage}
+            />
           </>
         )}
       </section>

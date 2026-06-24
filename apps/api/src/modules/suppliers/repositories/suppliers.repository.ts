@@ -25,6 +25,7 @@ export class SuppliersRepository extends TenantScopedRepository {
       ...(query.category && { category: query.category }),
       ...(query.active !== undefined && { active: query.active }),
       ...(query.search && {
+        // Índices GIN pg_trgm (migration 20260618130000) aceleram ILIKE %term%
         OR: [
           { name: { contains: query.search, mode: 'insensitive' } },
           { document: { contains: query.search.replace(/\D/g, '') } },

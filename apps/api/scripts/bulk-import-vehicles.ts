@@ -27,27 +27,9 @@ import {
   tenantFromEnv,
 } from './import-tenant-config';
 
-function loadEnvFile() {
-  const candidates = [
-    path.resolve(__dirname, '../../../.env'),
-    path.resolve(__dirname, '../.env'),
-  ];
-  for (const file of candidates) {
-    if (!fs.existsSync(file)) continue;
-    const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
-    for (const line of lines) {
-      const t = line.trim();
-      if (!t || t.startsWith('#')) continue;
-      const i = t.indexOf('=');
-      if (i <= 0) continue;
-      const key = t.slice(0, i).trim();
-      const val = t.slice(i + 1).trim().replace(/^["']|["']$/g, '');
-      if (!process.env[key]) process.env[key] = val;
-    }
-  }
-}
+import { loadEnvFiles } from './load-env-file';
 
-loadEnvFile();
+loadEnvFiles();
 
 const HEADER_ALIASES: Record<string, string> = {
   tipo: 'type',

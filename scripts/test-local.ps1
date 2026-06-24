@@ -48,7 +48,7 @@ if (-not (Test-PortOpen 5432)) {
 PostgreSQL nao esta acessivel em localhost:5432.
 1. Inicie o servico postgresql-x64-16 (services.msc)
 2. Ou rode: .\scripts\setup-postgres-db.ps1
-Veja docs/SETUP-POSTGRES-WINDOWS.md
+Veja docs/ONBOARDING.md
 "@
 }
 

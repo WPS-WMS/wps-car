@@ -3,15 +3,18 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './services/auth.service';
 import { JwtUserLoaderService } from './services/jwt-user-loader.service';
 import { PermissionsService } from './services/permissions.service';
 import { TokenService } from './services/token.service';
+import { TwoFactorService } from './services/two-factor.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
+    NotificationsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -30,6 +33,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     TokenService,
     PermissionsService,
     JwtUserLoaderService,
+    TwoFactorService,
     JwtStrategy,
     JwtAuthGuard,
   ],
@@ -38,6 +42,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     TokenService,
     PermissionsService,
     JwtUserLoaderService,
+    TwoFactorService,
     JwtModule,
     JwtAuthGuard,
   ],

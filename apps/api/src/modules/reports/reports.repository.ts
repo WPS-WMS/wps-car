@@ -65,7 +65,22 @@ export class ReportsRepository {
   async getStockRows(): Promise<StockReportRow[]> {
     const vehicles = await this.prisma.vehicle.findMany({
       where: { tenantId: this.tenantId(), status: { in: STOCK_STATUSES } },
-      include: { financial: true },
+      select: {
+        licensePlate: true,
+        brand: true,
+        model: true,
+        version: true,
+        modelYear: true,
+        status: true,
+        financial: {
+          select: {
+            purchaseValue: true,
+            totalCosts: true,
+            listedValue: true,
+            daysInStock: true,
+          },
+        },
+      },
       orderBy: { brand: 'asc' },
       take: MAX_EXPORT_ROWS,
     });
@@ -203,20 +218,28 @@ export class ReportsRepository {
 
     const sales = await this.prisma.sale.findMany({
       where,
-      include: {
-        vehicle: { include: { financial: true } },
+      select: {
+        amount: true,
+        commission: true,
+        vehicle: {
+          select: {
+            financial: {
+              select: {
+                purchaseValue: true,
+                totalCosts: true,
+                commissionValue: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    const vehicleIdsFromSales = new Set(sales.map((s) => s.vehicleId));
-
-    // Vendas preenchidas só na ficha financeira (sem registro em `sales`)
     const financialOnly =
       !query.status
         ? await this.prisma.vehicleFinancial.findMany({
             where: {
               tenantId,
-              vehicleId: { notIn: [...vehicleIdsFromSales] },
               saleValue: { not: null, gt: 0 },
               saleDate: {
                 ...(query.startDate && { gte: query.startDate }),
@@ -224,8 +247,14 @@ export class ReportsRepository {
               },
               ...(query.sellerId && { sellerId: query.sellerId }),
               ...(query.vehicleType
-                ? { vehicle: { type: query.vehicleType } }
-                : {}),
+                ? { vehicle: { type: query.vehicleType, sales: { none: {} } } }
+                : { vehicle: { sales: { none: {} } } }),
+            },
+            select: {
+              saleValue: true,
+              purchaseValue: true,
+              totalCosts: true,
+              commissionValue: true,
             },
           })
         : [];

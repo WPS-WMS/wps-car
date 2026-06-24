@@ -28,15 +28,27 @@ export interface AuthUser {
 }
 
 export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   expiresIn: string;
-  user: AuthUser;
+  user?: AuthUser;
+  requiresTwoFactor?: boolean;
+  twoFactorToken?: string;
+}
+
+export interface TwoFactorStatus {
+  eligible: boolean;
+  enabled: boolean;
+}
+
+export interface TwoFactorSetupResponse {
+  secret: string;
+  otpauthUrl: string;
 }
 
 export interface StockItem {
   id: string;
-  photo: { url: string } | null;
+  photo: Pick<VehiclePhoto, 'url' | 'thumbnailUrl'> | null;
   licensePlate: string | null;
   brand: string;
   model: string;
@@ -167,6 +179,29 @@ export interface EntityHistoryEntry {
   createdAt: string;
 }
 
+export interface ProfileAccessFeature {
+  id: string;
+  label: string;
+  description: string;
+  permission: string;
+  group: 'principal' | 'cadastro' | 'relatorios' | 'sistema';
+  enabled: boolean;
+}
+
+export interface ProfileAccessRoleConfig {
+  role: 'MANAGER' | 'SELLER';
+  label: string;
+  features: ProfileAccessFeature[];
+  enabledFeatures: string[];
+}
+
+export interface ProfileAccessResponse {
+  roles: ProfileAccessRoleConfig[];
+  groups: { id: string; label: string }[];
+  defaults: Record<'MANAGER' | 'SELLER', string[]>;
+  isCustomized: boolean;
+}
+
 export interface TenantSettingsResponse {
   settings: Record<string, unknown>;
   knownKeys: string[];
@@ -198,6 +233,39 @@ export interface ConfigEmailTemplate {
   active: boolean;
 }
 
+export interface EmailNotificationVariable {
+  name: string;
+  description: string;
+}
+
+export interface EmailNotificationTypeConfig {
+  code: string;
+  label: string;
+  description: string;
+  recipient: 'customer' | 'tenant_notification' | 'user' | 'seller';
+  recipientLabel: string;
+  triggerDescription: string;
+  supportsRoleRecipients: boolean;
+  recipientRoles: Array<'ADMIN' | 'MANAGER' | 'SELLER'>;
+  variables: EmailNotificationVariable[];
+  id: string | null;
+  subject: string;
+  bodyHtml: string;
+  active: boolean;
+  isConfigured: boolean;
+  defaults: {
+    subject: string;
+    bodyHtml: string;
+  };
+}
+
+export interface EmailNotificationsConfiguration {
+  senderEmail: string;
+  roles: Array<{ role: 'ADMIN' | 'MANAGER' | 'SELLER'; label: string }>;
+  defaultRecipients: Record<string, Array<'ADMIN' | 'MANAGER' | 'SELLER'>>;
+  types: EmailNotificationTypeConfig[];
+}
+
 export type ConfigCatalogResource = 'vehicle-types' | 'cost-types' | 'payment-methods';
 
 export interface TenantSummary {
@@ -208,6 +276,54 @@ export interface TenantSummary {
   phone: string | null;
   status: string;
   plan: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TenantUsageMetrics {
+  activeUsers: number;
+  totalUsers: number;
+  branches: number;
+  vehicles: number;
+  stockVehicles: number;
+  customers: number;
+  salesInPeriod: number;
+  revenueInPeriod: string;
+}
+
+export interface TenantPlatformMetrics {
+  tenant: TenantSummary;
+  usage: TenantUsageMetrics;
+}
+
+export interface PlatformMetricsResponse {
+  period: {
+    startDate: string;
+    endDate: string;
+    label: string;
+  };
+  tenants: TenantPlatformMetrics[];
+  totals: TenantUsageMetrics & {
+    tenantCount: number;
+    revenueInPeriod: string;
+  };
+  meta: PaginatedMeta;
+  cachedAt?: string;
+}
+
+export type ExportJobType = 'STOCK' | 'SALES' | 'SUMMARY';
+
+export type ExportJobStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface ExportJobResponse {
+  id: string;
+  type: ExportJobType;
+  format: 'pdf' | 'xlsx';
+  status: ExportJobStatus;
+  fileName: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  completedAt: string | null;
 }
 
 export interface TenantBranch {
@@ -244,6 +360,7 @@ export interface VehiclePhoto {
   fileName: string;
   filePath: string;
   url: string;
+  thumbnailUrl: string | null;
   mimeType: string;
   sizeBytes: number;
   sortOrder: number;
@@ -334,6 +451,40 @@ export interface FinancialResultSummary {
   calculatedAt: string | null;
 }
 
+export interface PlateLookupPurchase {
+  purchaseValue: string;
+  purchaseDate: string | null;
+  supplier: NamedEntity | null;
+  fipeValue: string | null;
+  suggestedPurchaseValue: string | null;
+  listedValue: string | null;
+  minimumValue: string | null;
+}
+
+export interface StockMovementItem {
+  id: string;
+  vehicleId: string;
+  type: string;
+  description: string | null;
+  reference: string | null;
+  userId: string | null;
+  user: NamedEntity | null;
+  createdAt: string;
+}
+
+export type PlateLookupResponse =
+  | { found: false; plate: string }
+  | {
+      found: true;
+      plate: string;
+      vehicle: Vehicle;
+      purchase: PlateLookupPurchase | null;
+      sales: Sale[];
+      costs: VehicleCost[];
+      financialResult: FinancialResultSummary | null;
+      stockMovements: StockMovementItem[];
+    };
+
 export interface SuggestPurchaseResult {
   fipeValue: string;
   estimatedCosts: string;
@@ -341,6 +492,242 @@ export interface SuggestPurchaseResult {
   desiredMarginAmount?: string;
   suggestedPurchaseValue: string;
   formula: string;
+}
+
+export interface PurchaseIntelligenceAnalysis {
+  queryId: string;
+  licensePlate: string;
+  provider: 'mock' | 'http';
+  referenceMonth?: string;
+  fipe: {
+    value: string;
+    vehicle: {
+      brand: string;
+      model: string;
+      modelYear: number;
+      manufactureYear: number;
+      version?: string;
+      fuel?: string;
+      color?: string;
+    };
+  };
+  analysis: {
+    desiredMarginPercent: number;
+    marginAmount: string;
+    estimatedCosts: string;
+    maxPurchaseValue: string;
+    formula: string;
+  };
+  existingInStock: StockItem | null;
+  defaultsUsed: {
+    defaultMarginPercent: number;
+    estimatedPrepCosts: number;
+  };
+}
+
+export interface PurchaseIntelligenceHistoryItem {
+  id: string;
+  licensePlate: string;
+  fipeValue: string | null;
+  desiredMarginPercent: string | null;
+  estimatedCosts: string | null;
+  maxPurchaseValue: string | null;
+  provider: string | null;
+  brand: string | null;
+  model: string | null;
+  modelYear: number | null;
+  existingVehicleId: string | null;
+  createdAt: string;
+  userId: string | null;
+}
+
+export interface PricingIntelligenceAnalysis {
+  queryId: string;
+  vehicle: {
+    id: string;
+    label: string;
+    brand: string;
+    model: string;
+    version?: string | null;
+    modelYear: number;
+    licensePlate?: string | null;
+    mileage?: number | null;
+    status: string;
+  };
+  fipe: {
+    value: string | null;
+    provider: string;
+    referenceMonth?: string | null;
+  };
+  sources: {
+    internalHistory: {
+      sampleCount: number;
+      averageSalePrice: string | null;
+      averageDaysToSell: number | null;
+    };
+    similarInStock: {
+      sampleCount: number;
+      averageListedPrice: string | null;
+    };
+    marketPortals: {
+      provider: string;
+      referenceMonth: string;
+      averageListingPrice: string;
+      sampleCount: number;
+      portals: string[];
+      portalQuotes: Array<{
+        portal: string;
+        averageListingPrice: string;
+        sampleCount: number;
+        minPrice: string | null;
+        maxPrice: string | null;
+        error?: string | null;
+      }>;
+    } | null;
+    tenantAvgDaysToSell: number | null;
+  };
+  context: {
+    purchaseValue: string;
+    totalCosts: string;
+    totalInvested: string;
+    daysInStock: number | null;
+    minMarginPercent: number;
+    marketReference: string;
+    minPriceFromMargin: string;
+    urgencyAdjustmentPercent: number;
+  };
+  suggestions: {
+    conservative: string;
+    competitive: string;
+    aggressive: string;
+    idealListing: string;
+    minimumRecommended: string;
+  };
+  insights: string[];
+  defaultsUsed: {
+    minMarginPercent: number;
+  };
+}
+
+export interface PricingIntelligenceHistoryItem {
+  id: string;
+  vehicleId: string;
+  vehicleLabel: string | null;
+  fipeValue: string | null;
+  marketReference: string | null;
+  minMarginPercent: number;
+  suggestions: {
+    conservative: string | null;
+    competitive: string | null;
+    aggressive: string | null;
+    idealListing: string | null;
+    minimumRecommended: string | null;
+  };
+  createdAt: string;
+}
+
+export type LeadStatus =
+  | 'NEW'
+  | 'CONTACTED'
+  | 'QUALIFIED'
+  | 'NEGOTIATION'
+  | 'WON'
+  | 'LOST';
+
+export type LeadSource =
+  | 'WHATSAPP'
+  | 'PHONE'
+  | 'STORE'
+  | 'WEBSITE'
+  | 'REFERRAL'
+  | 'OTHER';
+
+export type ContactChannel = 'PHONE' | 'WHATSAPP' | 'EMAIL' | 'VISIT' | 'OTHER';
+
+export type VehicleDocumentType =
+  | 'CRLV'
+  | 'INVOICE'
+  | 'PURCHASE_CONTRACT'
+  | 'SALE_CONTRACT'
+  | 'CAUTELAR_REPORT'
+  | 'OTHER';
+
+export interface CrmLead {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  source: LeadSource;
+  status: LeadStatus;
+  sellerId: string | null;
+  seller: { id: string; name: string; email: string } | null;
+  customerId: string | null;
+  expectedAmount: string | null;
+  notes: string | null;
+  nextFollowUpAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrmLeadDetail extends CrmLead {
+  contacts: Array<{
+    id: string;
+    channel: ContactChannel;
+    summary: string;
+    contactedAt: string;
+    whatsappLink?: string;
+    user: { id: string; name: string } | null;
+  }>;
+  interests: Array<{
+    id: string;
+    vehicleId: string;
+    vehicle: {
+      id: string;
+      brand: string;
+      model: string;
+      licensePlate: string | null;
+      status: string;
+    } | null;
+    notes: string | null;
+  }>;
+}
+
+export interface CrmOpportunity {
+  id: string;
+  title: string;
+  status: string;
+  amount: string | null;
+  customer: { id: string; name: string } | null;
+  vehicle: { id: string; brand: string; model: string; licensePlate: string | null } | null;
+  seller: { id: string; name: string } | null;
+  nextFollowUpAt: string | null;
+  createdAt: string;
+}
+
+export interface CrmReminder {
+  id: string;
+  title: string;
+  description: string | null;
+  dueAt: string;
+  status: 'PENDING' | 'DONE' | 'CANCELLED';
+  leadId: string | null;
+  opportunityId: string | null;
+  autoGenerated: boolean;
+}
+
+export interface CrmFunnel {
+  leads: Record<string, number>;
+  opportunities: Record<string, number>;
+}
+
+export interface VehicleDocument {
+  id: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  documentType: VehicleDocumentType | null;
+  url: string;
+  createdAt: string;
 }
 
 export interface Vehicle {

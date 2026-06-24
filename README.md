@@ -2,77 +2,63 @@
 
 SaaS multi-tenant para gestão de revendas de veículos.
 
-## Stack (planejada)
+## Stack
 
 | Camada | Tecnologia |
 |--------|------------|
-| Frontend | Next.js, TypeScript, Tailwind, shadcn/ui |
+| Frontend | Next.js, TypeScript, Tailwind |
 | Backend | NestJS, Prisma |
 | Banco | PostgreSQL |
-| Infra | Docker Compose |
+| Infra local | Docker Compose |
+| QA | Neon + Render + Firebase Hosting |
 
-## Fase atual
+## Comece aqui
 
-**Fase 2 — Fundação NestJS:** auth, multi-tenant, RBAC.
+**Novos colaboradores:** [docs/ONBOARDING.md](docs/ONBOARDING.md)
 
-**Fase 3 — Tenants & Users:** CRUD empresa (plataforma + `/me`), CRUD usuários, reset senha, permissões.
+Ambientes e secrets: [docs/ENV.md](docs/ENV.md) · Deploy QA: [docs/DEPLOY-QA.md](docs/DEPLOY-QA.md)
 
-**Fase 4 — Veículos & Estoque:** CRUD veículos, fotos (upload local), listagem estoque, movimentações, busca por placa.
-
-**Fase 5 — Clientes & Fornecedores:** CRUD, histórico, vendedor responsável, categorias de fornecedor.
-
-**Fase 6 — Financeiro & Custos:** valores por veículo, custos, comissão e resultado automático.
-
-**Fase 7 — Vendas & Comissões:** fluxo de venda, status, comissões e regras configuráveis.
-
-**Fase 8 — Configurações:** catálogos, margens padrão, e-mails.
-
-**Fase 9 — Dashboards:** gerencial, vendedor e ranking.
-
-**Fase 10 — Frontend:** login, dashboard, estoque e vendas (`apps/web`).
-
-**Fase 11 — Relatórios:** exportação PDF e Excel (estoque, vendas, resumo gerencial).
-
-- Arquitetura: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- Banco de dados: [docs/DATABASE.md](docs/DATABASE.md)
-- API auth/health: [docs/API-FOUNDATION.md](docs/API-FOUNDATION.md)
-
-## Como subir localmente
-
-**PostgreSQL no Windows (sem Docker):** [docs/SETUP-POSTGRES-WINDOWS.md](docs/SETUP-POSTGRES-WINDOWS.md)
-
-**Com Docker:**
+## Subir localmente
 
 ```powershell
-# Raiz — PostgreSQL
+# 1. Postgres (Docker)
 Copy-Item .env.example .env
 docker compose up -d
 
-# API
-cd apps/api
-Copy-Item .env.example .env
+# 2. API
+cd apps\api
+Copy-Item .env.local.example .env.local
 npm install
 npx prisma generate
-npx prisma migrate dev --name init
+npm run prisma:migrate:deploy
 npm run db:seed
 npm run start:dev
-```
 
-API: `http://localhost:3001/api/v1/health`
-
-```powershell
-# Frontend (com API rodando)
-cd apps/web
-Copy-Item .env.example .env.local
+# 3. Web (outro terminal)
+cd apps\web
 npm install
 npm run dev
 ```
 
-Web: `http://localhost:3000` — login demo: `admin@revendademo.com.br` / `Admin@123` (CNPJ `00000000000191`)
+- API: `http://localhost:3001/api/v1/health`
+- Web: `http://localhost:3000`
+- Login demo: `admin@revendademo.com.br` / `Admin@123` (somente e-mail e senha)
 
-## Documentação API
+## Documentação
+
+### Entrada e infra
+
+- [Onboarding](docs/ONBOARDING.md)
+- [Variáveis de ambiente](docs/ENV.md)
+- [Arquitetura](docs/ARCHITECTURE.md)
+- [Frontend](docs/FRONTEND.md)
+- [Banco de dados](docs/DATABASE.md)
+- [Deploy QA](docs/DEPLOY-QA.md)
+
+### API
 
 - [Fundação (auth)](docs/API-FOUNDATION.md)
+- [Plataforma / moderador](docs/API-PLATFORM.md)
 - [Tenants & Users](docs/API-TENANTS-USERS.md)
 - [Veículos & Estoque](docs/API-VEHICLES-STOCK.md)
 - [Clientes & Fornecedores](docs/API-CUSTOMERS-SUPPLIERS.md)
@@ -81,24 +67,21 @@ Web: `http://localhost:3000` — login demo: `admin@revendademo.com.br` / `Admin
 - [Configurações](docs/API-SETTINGS.md)
 - [Dashboards](docs/API-DASHBOARDS.md)
 - [Relatórios](docs/API-REPORTS.md)
-- [Importação em lote de veículos (CSV)](docs/IMPORT-VEHICLES.md)
-- [Relatório geral (funcional)](docs/GENERAL-REPORT.md)
-- [Resultado financeiro por veículo (funcional)](docs/FINANCIAL-RESULT.md)
+- [Compra inteligente](docs/API-PURCHASE-INTELLIGENCE.md)
 
-## Ambiente QA (Firebase + Render + Neon)
+### Operações
 
-Passo a passo completo: [docs/DEPLOY-QA.md](docs/DEPLOY-QA.md)
+- [Importação CSV de veículos](docs/IMPORT-VEHICLES.md)
+- [Teste multi-tenant](docs/MULTI-TENANT-TEST.md)
 
-Arquivos na raiz: `render.yaml`, `firebase.json`, `.firebaserc.example`.
+### Especificações de produto
 
-Deploy do frontend QA:
+- [product/](docs/product/)
+
+## Deploy QA
 
 ```powershell
 npm run deploy:qa
 ```
 
-(Requer `apps/web/.env.production.local` com `NEXT_PUBLIC_API_URL` do Render.)
-
-## Próximo passo
-
-Evoluções opcionais: mais tipos de relatório, filtros avançados, agendamento por e-mail.
+Requer `apps/web/.env.production.local` (ver `.env.production.local.example`). Passo a passo: [docs/DEPLOY-QA.md](docs/DEPLOY-QA.md).

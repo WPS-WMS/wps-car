@@ -45,6 +45,7 @@ export class TenantsController {
 
   @SkipTenant()
   @Get()
+  @Roles(UserRole.MODERATOR)
   @Permissions('tenants:read')
   findAll(@Query() query: ListTenantsQueryDto) {
     return this.tenantsService.findAll(query);
@@ -52,6 +53,7 @@ export class TenantsController {
 
   @SkipTenant()
   @Post()
+  @Roles(UserRole.MODERATOR)
   @Permissions('tenants:manage')
   create(@Body() dto: CreateTenantDto) {
     return this.tenantsService.create(dto);
@@ -59,6 +61,7 @@ export class TenantsController {
 
   @SkipTenant()
   @Get(':id')
+  @Roles(UserRole.MODERATOR)
   @Permissions('tenants:read')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.tenantsService.findById(id);
@@ -66,6 +69,7 @@ export class TenantsController {
 
   @SkipTenant()
   @Patch(':id')
+  @Roles(UserRole.MODERATOR)
   @Permissions('tenants:manage')
   update(
     @Param('id', ParseUUIDPipe) id: string,

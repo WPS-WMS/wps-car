@@ -58,9 +58,9 @@ O Render roda `prisma migrate deploy` no **build** (uma vez por deploy), não a 
 | Build Command | `npm ci --include=dev && npx prisma generate && npm run build` |
 | Pre-Deploy Command | `bash scripts/prisma-migrate-deploy.sh` |
 | Start Command | `npm run start:render` |
+| Health Check Path | `/api/v1/health` |
 
 > **Importante:** se no log aparecer `Running 'npx prisma migrate deploy && npm run start:prod'`, o painel do Render **não** está usando o `render.yaml`. Abra **Settings → Start Command** e cole exatamente: `npm run start:render`
-| Health Check Path | `/api/v1/health` |
 
 ### Variáveis de ambiente (obrigatórias)
 
@@ -72,8 +72,11 @@ O Render roda `prisma migrate deploy` no **build** (uma vez por deploy), não a 
 | `JWT_REFRESH_SECRET` | Mín. 32 caracteres aleatórios |
 | `CORS_ORIGIN` | URLs do Firebase, **separadas por vírgula** |
 | `NODE_ENV` | `production` |
+| `WEB_APP_URL` | URL do Firebase (ex.: `https://projeto.web.app`) — links de recuperação de senha |
 
-Opcionais (já têm default): `API_PREFIX`, `JWT_*_EXPIRES_IN`, `UPLOAD_DIR`, `MAX_FILE_SIZE_MB`.
+Opcionais: `API_PREFIX`, `JWT_*_EXPIRES_IN`, `UPLOAD_DIR`, `MAX_FILE_SIZE_MB`.
+
+**E-mail (opcional):** `MAIL_ENABLED`, `SMTP_*`, `MAIL_FROM` — ver [ENV.md](./ENV.md).
 
 **`CORS_ORIGIN` (exemplo após publicar o Firebase):**
 
@@ -125,7 +128,7 @@ O Next.js embute `NEXT_PUBLIC_*` no build. Configure antes do deploy:
 
 ```powershell
 cd apps/web
-Copy-Item .env.qa.example .env.production.local
+Copy-Item .env.production.local.example .env.production.local
 # Edite: NEXT_PUBLIC_API_URL=https://SUA-API.onrender.com/api/v1
 ```
 
@@ -184,7 +187,7 @@ O `next.config.ts` já libera imagens do host da API definido em `NEXT_PUBLIC_AP
 ## 4. Checklist pós-deploy
 
 - [ ] `GET https://...onrender.com/api/v1/health` → `ok`
-- [ ] Login no Firebase URL com usuário do seed (`admin@revendademo.com.br` / `Admin@123`, CNPJ `00000000000191`)
+- [ ] Login no Firebase URL com usuário do seed (`admin@revendademo.com.br` / `Admin@123` — somente e-mail e senha)
 - [ ] Sem erro de CORS no DevTools (Network)
 - [ ] Cookies/tokens: API e front em domínios diferentes — o app usa Bearer no `Authorization` (já compatível)
 
@@ -195,14 +198,16 @@ O `next.config.ts` já libera imagens do host da API definido em `NEXT_PUBLIC_AP
 | Onde | O que guardar |
 |------|----------------|
 | Neon | `DATABASE_URL` |
-| Render | `DATABASE_URL`, JWT secrets, `CORS_ORIGIN` |
+| Render | `DATABASE_URL`, JWT secrets, `CORS_ORIGIN`, `WEB_APP_URL`, SMTP (opcional) |
 | Firebase / build | `NEXT_PUBLIC_API_URL` |
 | Repositório | Apenas `*.example` — nunca secrets reais |
+
+Detalhes de variáveis local/QA: [ENV.md](./ENV.md).
 
 Arquivos de referência:
 
 - `apps/api/.env.qa.example`
-- `apps/web/.env.qa.example`
+- `apps/web/.env.production.local.example`
 - `render.yaml`
 - `firebase.json`
 - `.firebaserc.example`

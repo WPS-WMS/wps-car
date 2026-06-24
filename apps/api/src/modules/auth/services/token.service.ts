@@ -5,6 +5,14 @@ import { UserRole } from '@prisma/client';
 import { JwtPayload } from '../interfaces/authenticated-user.interface';
 import { TokenPair } from '../interfaces/token-pair.interface';
 
+type TokenUser = {
+  id: string;
+  email: string;
+  role: UserRole;
+  tenantId: string | null;
+  tokenVersion: number;
+};
+
 @Injectable()
 export class TokenService {
   constructor(
@@ -32,17 +40,42 @@ export class TokenService {
     );
   }
 
-  generatePair(user: {
-    id: string;
-    email: string;
-    role: UserRole;
-    tenantId: string | null;
-  }): TokenPair {
+  generateTwoFactorPendingToken(user: TokenUser): string {
+    return this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+        tokenVersion: user.tokenVersion,
+        type: '2fa_pending',
+      },
+      {
+        secret: this.config.getOrThrow<string>('jwt.accessSecret'),
+        expiresIn: '5m',
+      },
+    );
+  }
+
+  verifyTwoFactorPendingToken(token: string): JwtPayload {
+    const payload = this.jwtService.verify<JwtPayload>(token, {
+      secret: this.config.getOrThrow<string>('jwt.accessSecret'),
+    });
+
+    if (payload.type !== '2fa_pending') {
+      throw new Error('Token 2FA inválido');
+    }
+
+    return payload;
+  }
+
+  generatePair(user: TokenUser): TokenPair {
     const base = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      tokenVersion: user.tokenVersion,
     };
 
     return {

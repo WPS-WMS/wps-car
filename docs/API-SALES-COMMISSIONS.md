@@ -51,7 +51,7 @@ PATCH /api/v1/sales/{id}
 Atualiza automaticamente:
 - `VehicleFinancial` (valor, data, cliente, vendedor)
 - Resultado financeiro (lucro, margem, comissão)
-- `Sale.commission` com valor calculado (**snapshot congelado** — ver [FINANCIAL-RESULT.md](./FINANCIAL-RESULT.md))
+- `Sale.commission` com valor calculado (**snapshot congelado** — ver [product/FINANCIAL-RESULT.md](./product/FINANCIAL-RESULT.md))
 
 ---
 
@@ -66,6 +66,14 @@ Base: `/commission-rules`
 | POST | `/` | `commissions:configure` |
 | PATCH | `/:id` | `commissions:configure` |
 | PATCH | `/:id/deactivate` | `commissions:configure` |
+
+Perfis permitidos: `ADMIN`, `MANAGER`, `SELLER` — **não** `MODERATOR`.
+
+### Comissão do vendedor
+
+Além de override por veículo e regra padrão da empresa, configure comissão individual via `PATCH /users/:id` (`commissionType`, `commissionValue`) ou UI **Configurações → Comissão por vendedor**.
+
+Prioridade no cálculo: override veículo → regra do vendedor → regra padrão da empresa.
 
 ### Tipos
 
@@ -112,7 +120,7 @@ PUT /api/v1/vehicles/{id}/commission-override
 
 Prioridade (negociações abertas): **override do veículo** → **regra do vendedor** → **regra padrão**.
 
-Vendas finalizadas (`SOLD` / `COMPLETED`): comissão **congelada** em `Sale.commission` — alterações de regra não afetam retroativamente. Detalhes: [FINANCIAL-RESULT.md](./FINANCIAL-RESULT.md).
+Vendas finalizadas (`SOLD` / `COMPLETED`): comissão **congelada** em `Sale.commission` — alterações de regra não afetam retroativamente. Detalhes: [product/FINANCIAL-RESULT.md](./product/FINANCIAL-RESULT.md).
 
 ---
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { CommissionRuleType, UserRole } from '@prisma/client';
+import { CommissionRuleType, UserRole, AuditAction } from '@prisma/client';
 import { DomainException } from '../../domain/exceptions/domain.exception';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { toUserResponse } from '../../common/mappers/user.mapper';
@@ -13,6 +13,10 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserPermissionsDto } from './dto/update-user-permissions.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { UsersRepository } from './repositories/users.repository';
+import { AuditService } from '../audit/audit.service';
+import { EmailDispatchService } from '../notifications/email-dispatch.service';
+import { JwtUserLoaderService } from '../auth/services/jwt-user-loader.service';
+import { PermissionsService } from '../auth/services/permissions.service';
 
 @Injectable()
 export class UsersService {
@@ -22,9 +26,26 @@ export class UsersService {
     private readonly usersRepository: UsersRepository,
     private readonly tenantContext: TenantContextService,
     private readonly prisma: PrismaService,
+    private readonly emailDispatch: EmailDispatchService,
+    private readonly jwtUserLoader: JwtUserLoaderService,
+    private readonly permissionsService: PermissionsService,
+    private readonly audit: AuditService,
   ) {}
 
+  private invalidateAuthCache(userId: string) {
+    void this.jwtUserLoader.invalidate(userId);
+    void this.permissionsService.invalidateForUser(userId);
+  }
+
   async findAll(query: ListUsersQueryDto) {
+    if (query.role === UserRole.MODERATOR) {
+      throw new DomainException(
+        'INVALID_ROLE_FILTER',
+        'Perfil indisponível para consulta',
+        400,
+      );
+    }
+
     const { data, total, page, limit } =
       await this.usersRepository.findManyPaginated(query);
 
@@ -106,7 +127,30 @@ export class UsersService {
       return created;
     });
 
+    void this.sendWelcomeEmail(tenantId, user);
+
     return toUserResponse(user);
+  }
+
+  private async sendWelcomeEmail(
+    tenantId: string,
+    user: { name: string; email: string },
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true },
+    });
+
+    await this.emailDispatch.sendTypedEmail({
+      tenantId,
+      code: 'user_welcome',
+      to: user.email,
+      variables: {
+        userName: user.name,
+        userEmail: user.email,
+        companyName: tenant?.name ?? 'WPS Car',
+      },
+    });
   }
 
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser) {
@@ -189,6 +233,8 @@ export class UsersService {
       await this.usersRepository.revokeAllSessions(id);
     }
 
+    this.invalidateAuthCache(id);
+
     return toUserResponse(updated);
   }
 
@@ -228,6 +274,17 @@ export class UsersService {
     });
 
     await this.usersRepository.revokeAllSessions(id);
+
+    this.invalidateAuthCache(id);
+
+    await this.audit.log({
+      action: AuditAction.USER_PASSWORD_RESET,
+      userId: actor.id,
+      tenantId: actor.tenantId,
+      entityType: 'user',
+      entityId: id,
+      metadata: { targetEmail: user.email },
+    });
 
     return { message: 'Senha redefinida com sucesso' };
   }
@@ -273,6 +330,22 @@ export class UsersService {
     );
 
     await this.usersRepository.update(id, { updatedById: actor.id });
+
+    this.invalidateAuthCache(id);
+
+    await this.audit.log({
+      action: AuditAction.USER_PERMISSIONS_UPDATED,
+      userId: actor.id,
+      tenantId: actor.tenantId,
+      entityType: 'user',
+      entityId: id,
+      metadata: {
+        overrides: dto.permissions.map((item) => ({
+          code: item.code,
+          granted: item.granted,
+        })),
+      },
+    });
 
     return toUserResponse(updated);
   }

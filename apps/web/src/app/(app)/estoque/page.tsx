@@ -1,17 +1,20 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Image from 'next/image';
+import {
+  VehicleStockPhotoCell,
+  vehicleStockPhotoFallback,
+} from '@/components/vehicles/vehicle-stock-photo-cell';
 import { useState } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Pencil } from 'lucide-react';
+import { Search, Plus, Pencil, ScanSearch, Sparkles } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
 import { api } from '@/lib/api';
 import { vehicleEditHref } from '@/lib/edit-routes';
 import { formatCurrency } from '@/lib/format';
-import { mediaUrl } from '@/lib/media';
 import { vehicleStatusLabels, vehicleStatusVariant } from '@/lib/labels';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -27,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import { ExportButtons } from '@/components/reports/export-buttons';
 import { PageHeader } from '@/components/layout/page-header';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { SelectField } from '@/components/ui/select-field';
 import { Card } from '@/components/ui/card';
 import { BranchFilterField } from '@/components/filters/branch-filter-field';
@@ -36,18 +40,21 @@ export default function EstoquePage() {
   const { user, isAdmin } = useAuth();
   const canCreate = hasPermission(user, 'vehicles:create');
   const canUpdate = hasPermission(user, 'vehicles:update');
+  const canLookupPlate = hasPermission(user, 'stock:read');
+  const canPurchaseIntel = hasPermission(user, 'purchase-intelligence:read');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
 
   const query = useQuery({
-    queryKey: ['stock', { search, status, page, branchFilter, isAdmin }],
+    queryKey: ['stock', { search: debouncedSearch, status, page, branchFilter, isAdmin }],
     queryFn: () =>
       api.getStock({
         page,
         limit: 20,
-        ...(search ? { search } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
         ...(status ? { status } : {}),
         ...(isAdmin && branchFilter !== 'all' ? { branchId: branchFilter } : {}),
       }),
@@ -62,6 +69,18 @@ export default function EstoquePage() {
         title="Estoque"
         description="Veículos disponíveis e em preparação"
       >
+        {canPurchaseIntel ? (
+          <Link href="/compra-inteligente" className={cn(buttonVariants({ variant: 'outline' }))}>
+            <Sparkles className="h-4 w-4" />
+            Compra inteligente
+          </Link>
+        ) : null}
+        {canLookupPlate ? (
+          <Link href="/estoque/consulta-placa" className={cn(buttonVariants({ variant: 'outline' }))}>
+            <ScanSearch className="h-4 w-4" />
+            Consulta por placa
+          </Link>
+        ) : null}
         {canCreate ? (
           <Link href="/veiculos/novo" className={cn(buttonVariants())}>
             <Plus className="h-4 w-4" />
@@ -136,7 +155,6 @@ export default function EstoquePage() {
             </TableHeader>
             <TableBody>
               {items.map((item) => {
-                const src = mediaUrl(item.photo?.url);
                 const editHref = vehicleEditHref(item.id);
                 return (
                   <TableRow
@@ -153,20 +171,12 @@ export default function EstoquePage() {
                     }
                   >
                     <TableCell>
-                      {src ? (
-                        <Image
-                          src={src}
-                          alt=""
-                          width={48}
-                          height={36}
-                          className="h-9 w-12 rounded object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="flex h-9 w-12 items-center justify-center rounded-md bg-brand-50 text-xs text-brand-500">
-                          —
-                        </div>
-                      )}
+                      <VehicleStockPhotoCell
+                        vehicleId={item.id}
+                        photoUrl={item.photo?.url}
+                        photoThumbUrl={item.photo?.thumbnailUrl}
+                        label={vehicleStockPhotoFallback(item)}
+                      />
                     </TableCell>
                     <TableCell className="font-medium">
                       {canUpdate ? (
@@ -231,31 +241,7 @@ export default function EstoquePage() {
             </TableBody>
           </Table>
 
-          {meta && meta.totalPages > 1 ? (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-brand-600">
-                Página {meta.page} de {meta.totalPages} ({meta.total} itens)
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasPreviousPage}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasNextPage}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Próxima
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <PaginationControls meta={meta} onPageChange={setPage} />
         </>
       )}
     </div>

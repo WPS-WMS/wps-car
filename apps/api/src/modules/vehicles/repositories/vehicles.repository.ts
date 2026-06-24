@@ -7,9 +7,30 @@ import { resolvePagination } from '../../../common/utils/pagination.util';
 import { normalizeLicensePlate } from '../../../common/utils/license-plate.util';
 import { ListVehiclesQueryDto } from '../dto/list-vehicles-query.dto';
 
+const vehicleListInclude = {
+  photos: {
+    orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }],
+    take: 1,
+  },
+  financial: true,
+  branch: { select: { id: true, name: true } },
+} satisfies Prisma.VehicleInclude;
+
 const vehicleInclude = {
   photos: { orderBy: { sortOrder: 'asc' as const } },
   financial: true,
+  branch: { select: { id: true, name: true } },
+} satisfies Prisma.VehicleInclude;
+
+const vehicleLookupInclude = {
+  photos: { orderBy: { sortOrder: 'asc' as const } },
+  financial: {
+    include: {
+      supplier: { select: { id: true, name: true } },
+      customer: { select: { id: true, name: true } },
+      seller: { select: { id: true, name: true, email: true } },
+    },
+  },
   branch: { select: { id: true, name: true } },
 } satisfies Prisma.VehicleInclude;
 
@@ -51,6 +72,7 @@ export class VehiclesRepository extends TenantScopedRepository {
         licensePlate: normalizeLicensePlate(query.licensePlate),
       }),
       ...(query.search && {
+        // Índices GIN pg_trgm (migration 20260617120000) aceleram ILIKE %term%
         OR: [
           { brand: { contains: query.search, mode: 'insensitive' } },
           { model: { contains: query.search, mode: 'insensitive' } },
@@ -74,7 +96,7 @@ export class VehiclesRepository extends TenantScopedRepository {
         skip,
         take: limit,
         orderBy: orderBy ?? listOrderBy,
-        include: vehicleInclude,
+        include: vehicleListInclude,
       }),
       this.prisma.vehicle.count({ where }),
     ]);
@@ -89,13 +111,13 @@ export class VehiclesRepository extends TenantScopedRepository {
     });
   }
 
-  async findByLicensePlate(licensePlate: string) {
+  async findByLicensePlate(licensePlate: string, detailed = false) {
     return this.prisma.vehicle.findFirst({
       where: {
         tenantId: this.tenantId(),
         licensePlate: normalizeLicensePlate(licensePlate),
       },
-      include: vehicleInclude,
+      include: detailed ? vehicleLookupInclude : vehicleListInclude,
     });
   }
 
@@ -188,7 +210,7 @@ export class VehiclesRepository extends TenantScopedRepository {
         skip,
         take: limit,
         orderBy: orderBy ?? listOrderBy,
-        include: vehicleInclude,
+        include: vehicleListInclude,
       }),
       this.prisma.vehicle.count({ where }),
     ]);

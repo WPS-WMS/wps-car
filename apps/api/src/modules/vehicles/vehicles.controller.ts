@@ -69,7 +69,10 @@ export class VehiclesController {
 
   @Delete(':id')
   @Permissions('vehicles:delete')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.vehiclesService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.vehiclesService.remove(id, actor);
   }
 }

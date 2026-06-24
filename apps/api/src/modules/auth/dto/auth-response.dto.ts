@@ -11,8 +11,10 @@ export class AuthUserResponseDto {
 }
 
 export class LoginResponseDto {
-  accessToken!: string;
-  refreshToken!: string;
+  accessToken?: string;
+  refreshToken?: string;
   expiresIn!: string;
-  user!: AuthUserResponseDto;
+  user?: AuthUserResponseDto;
+  requiresTwoFactor?: boolean;
+  twoFactorToken?: string;
 }

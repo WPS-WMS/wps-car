@@ -2,28 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingCart,
-  LogOut,
-  Car,
-  CarFront,
-  Settings,
-} from 'lucide-react';
+import { LogOut, Car, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
+import { canAccessConfiguracoes } from '@/lib/configuracoes-nav';
+import { MAIN_NAV_ITEMS, SETTINGS_NAV_ITEM } from '@/lib/sidebar-nav';
 import { Button } from '@/components/ui/button';
-import { NavCadastro } from './nav-cadastro';
 import { NavRelatorios } from './nav-relatorios';
-
-const nav = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/veiculos', label: 'Veículos e produtos', icon: CarFront },
-  { href: '/estoque', label: 'Estoque', icon: Package },
-  { href: '/vendas', label: 'Vendas', icon: ShoppingCart },
-];
 
 function userInitial(name?: string) {
   if (!name) return 'U';
@@ -47,6 +33,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         : 'text-slate-300 hover:bg-sidebar-accent hover:text-white',
     );
 
+  const mainNav = MAIN_NAV_ITEMS.filter((item) => hasPermission(user, item.permission));
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <aside className="flex h-full w-[260px] shrink-0 flex-col bg-sidebar-gradient text-sidebar-foreground shadow-xl">
@@ -63,7 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {nav.map((item) => {
+          {mainNav.map((item) => {
             const Icon = item.icon;
             const active = pathname.startsWith(item.href);
             return (
@@ -73,15 +61,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          <NavCadastro navLinkClass={navLinkClass} />
           <NavRelatorios navLinkClass={navLinkClass} />
-          {hasPermission(user, 'settings:read') ? (
+          {canAccessConfiguracoes(user) ? (
             <Link
-              href="/configuracoes"
-              className={navLinkClass(pathname.startsWith('/configuracoes'))}
+              href={SETTINGS_NAV_ITEM.href}
+              className={navLinkClass(pathname.startsWith(SETTINGS_NAV_ITEM.href))}
             >
               <Settings className="h-4 w-4 shrink-0" />
-              Configurações
+              {SETTINGS_NAV_ITEM.label}
             </Link>
           ) : null}
         </nav>

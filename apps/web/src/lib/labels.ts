@@ -100,3 +100,27 @@ export function vehicleStatusVariant(
       return 'secondary';
   }
 }
+
+export const vehicleCostTypeLabels: Record<string, string> = {
+  PAINTING: 'Pintura',
+  MECHANICS: 'Mecânica',
+  BODYWORK: 'Funilaria',
+  SANITIZATION: 'Higienização',
+  DOCUMENTATION: 'Documentação',
+  DISPATCHER: 'Despachante',
+  TRANSPORT: 'Transporte',
+  TOWING: 'Guincho',
+  ADVERTISING: 'Publicidade',
+  COMMISSION: 'Comissão',
+  WASHING: 'Lavagem',
+  REVISION: 'Revisão',
+  OTHER: 'Outros',
+};
+
+export const stockMovementTypeLabels: Record<string, string> = {
+  ENTRY: 'Entrada',
+  EXIT: 'Saída',
+  ADJUSTMENT: 'Ajuste',
+  RESERVATION: 'Reserva',
+  RELEASE: 'Liberação',
+};

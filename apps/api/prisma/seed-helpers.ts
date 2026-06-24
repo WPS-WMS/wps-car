@@ -134,17 +134,51 @@ export async function seedTenantConfiguration(tenantId: string) {
     });
   }
 
-  await prisma.configEmailTemplate.upsert({
-    where: { tenantId_code: { tenantId, code: 'sale_completed' } },
-    update: {},
-    create: {
-      tenantId,
+  const emailTemplates = [
+    {
       code: 'sale_completed',
       subject: 'Parabéns pela sua compra!',
-      bodyHtml: '<p>Olá {{customerName}}, sua compra do veículo {{vehicleName}} foi concluída.</p>',
+      bodyHtml:
+        '<p>Olá {{customerName}}, sua compra do veículo {{vehicleName}} foi concluída.</p>',
       active: true,
     },
-  });
+    {
+      code: 'sale_registered',
+      subject: 'Nova venda registrada — {{vehicleName}}',
+      bodyHtml:
+        '<p>Nova venda: {{vehicleName}} — cliente {{customerName}} — vendedor {{sellerName}}.</p>',
+      active: false,
+    },
+    {
+      code: 'vehicle_reserved',
+      subject: 'Reserva confirmada — {{vehicleName}}',
+      bodyHtml:
+        '<p>Olá {{customerName}}, o veículo {{vehicleName}} foi reservado para você.</p>',
+      active: false,
+    },
+    {
+      code: 'user_welcome',
+      subject: 'Bem-vindo ao WPS Car — {{companyName}}',
+      bodyHtml:
+        '<p>Olá {{userName}}, sua conta {{userEmail}} foi criada na revenda {{companyName}}.</p>',
+      active: false,
+    },
+    {
+      code: 'password_reset',
+      subject: 'Redefinição de senha — {{companyName}}',
+      bodyHtml:
+        '<p>Olá {{userName}},</p><p><a href="{{resetLink}}">Clique aqui para redefinir sua senha</a>.</p><p>Validade: {{resetExpiresMinutes}} minutos.</p>',
+      active: true,
+    },
+  ] as const;
+
+  for (const template of emailTemplates) {
+    await prisma.configEmailTemplate.upsert({
+      where: { tenantId_code: { tenantId, code: template.code } },
+      update: {},
+      create: { tenantId, ...template },
+    });
+  }
 }
 
 async function seedTenantBranches(

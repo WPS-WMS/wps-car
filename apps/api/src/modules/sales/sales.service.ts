@@ -14,6 +14,9 @@ import { UpdateSaleDto } from './dto/update-sale.dto';
 import { ListSalesQueryDto } from './dto/list-sales-query.dto';
 import { SalesRepository } from './repositories/sales.repository';
 import { CommissionReportQueryDto } from './dto/commission-report-query.dto';
+import { AuditAction } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { SaleNotificationService } from '../notifications/sale-notification.service';
 
 const FINALIZED_STATUSES: SaleStatus[] = [SaleStatus.SOLD, SaleStatus.COMPLETED];
 
@@ -26,6 +29,8 @@ export class SalesService {
     private readonly tenantContext: TenantContextService,
     private readonly prisma: PrismaService,
     private readonly dataScope: DataScopeService,
+    private readonly saleNotifications: SaleNotificationService,
+    private readonly audit: AuditService,
   ) {}
 
   async findAll(query: ListSalesQueryDto, actor: AuthenticatedUser) {
@@ -92,7 +97,27 @@ export class SalesService {
 
     await this.applyStatusSideEffects(sale, status, dto.amount, dto.saleDate);
 
+    void this.saleNotifications.notifySaleCreated(sale.id, tenantId);
+    if (FINALIZED_STATUSES.includes(status)) {
+      void this.saleNotifications.notifySaleFinalized(sale.id, tenantId);
+    }
+
     const refreshed = await this.salesRepository.findById(sale.id);
+
+    await this.audit.log({
+      action: AuditAction.SALE_CREATED,
+      userId: actor.id,
+      tenantId,
+      entityType: 'sale',
+      entityId: sale.id,
+      metadata: {
+        vehicleId: dto.vehicleId,
+        customerId: dto.customerId,
+        amount: dto.amount,
+        status,
+      },
+    });
+
     return toSaleResponse(refreshed!);
   }
 
@@ -143,6 +168,13 @@ export class SalesService {
       } else {
         await this.applyStatusSideEffects(updated, newStatus, newAmount, newSaleDate);
       }
+
+      void this.saleNotifications.notifySaleStatusChange(
+        id,
+        sale.tenantId,
+        sale.status,
+        newStatus,
+      );
     } else if (FINALIZED_STATUSES.includes(newStatus) && (dto.amount || dto.saleDate)) {
       await this.syncFinancialOnFinalize(updated, newAmount, newSaleDate);
     }

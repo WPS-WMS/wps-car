@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Mail, Phone, MapPin, Truck } from 'lucide-react';
@@ -9,9 +10,10 @@ import { supplierEditHref } from '@/lib/edit-routes';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
 import { supplierCategoryLabels } from '@/lib/person-labels';
-import { PageHeader } from '@/components/layout/page-header';
+import { SettingsPageShell } from '@/components/settings/settings-page-shell';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { SearchBar } from '@/components/ui/search-bar';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { SelectField } from '@/components/ui/select-field';
@@ -21,16 +23,17 @@ export default function FornecedoresPage() {
   const canCreate = hasPermission(user, 'suppliers:create');
   const canUpdate = hasPermission(user, 'suppliers:update');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [category, setCategory] = useState('');
   const [page, setPage] = useState(1);
 
   const query = useQuery({
-    queryKey: ['suppliers', 'list', { search, category, page }],
+    queryKey: ['suppliers', 'list', { search: debouncedSearch, category, page }],
     queryFn: () =>
       api.getSuppliers({
         page,
         limit: 20,
-        ...(search ? { search } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
         ...(category ? { category } : {}),
       }),
   });
@@ -39,17 +42,18 @@ export default function FornecedoresPage() {
   const meta = query.data?.meta;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Fornecedores" description="Gerencie seus fornecedores">
+    <SettingsPageShell title="Fornecedores" description="Gerencie seus fornecedores">
+      <div className="space-y-6">
         {canCreate ? (
-          <Link href="/fornecedores/novo" className={cn(buttonVariants())}>
-            <Plus className="h-4 w-4" />
-            Novo fornecedor
-          </Link>
+          <div className="flex justify-end">
+            <Link href="/fornecedores/novo" className={cn(buttonVariants())}>
+              <Plus className="h-4 w-4" />
+              Novo fornecedor
+            </Link>
+          </div>
         ) : null}
-      </PageHeader>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <SearchBar
           className="flex-1"
           placeholder="Buscar fornecedor…"
@@ -144,33 +148,10 @@ export default function FornecedoresPage() {
             </Card>
           ) : null}
 
-          {meta && meta.totalPages > 1 ? (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Página {meta.page} de {meta.totalPages} ({meta.total} itens)
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasPreviousPage}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasNextPage}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Próxima
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <PaginationControls meta={meta} onPageChange={setPage} />
         </>
       )}
-    </div>
+      </div>
+    </SettingsPageShell>
   );
 }

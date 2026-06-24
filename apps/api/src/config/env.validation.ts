@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  MinLength,
   validateSync,
 } from 'class-validator';
 
@@ -31,10 +32,12 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(32)
   JWT_ACCESS_SECRET!: string;
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(32)
   JWT_REFRESH_SECRET!: string;
 
   @IsString()
@@ -61,6 +64,45 @@ export class EnvironmentVariables {
   @Min(1)
   @IsOptional()
   MAX_FILE_SIZE_MB: number = 10;
+
+  @IsString()
+  @IsOptional()
+  REDIS_URL?: string;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  EXPORT_RETENTION_DAYS: number = 7;
+
+  @IsString()
+  @IsOptional()
+  MARKET_LISTINGS_PROVIDER: string = 'mock';
+
+  @IsString()
+  @IsOptional()
+  MARKET_LISTINGS_HTTP_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  MARKET_LISTINGS_HTTP_URLS?: string;
+
+  @IsString()
+  @IsOptional()
+  MARKET_LISTINGS_HTTP_HEADERS?: string;
+
+  @IsString()
+  @IsOptional()
+  MARKET_LISTINGS_HTTP_API_KEY?: string;
+
+  @IsInt()
+  @Min(1000)
+  @IsOptional()
+  MARKET_LISTINGS_HTTP_TIMEOUT_MS: number = 8000;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  MARKET_LISTINGS_HTTP_MIN_SUCCESS: number = 1;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

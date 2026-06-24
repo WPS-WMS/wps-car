@@ -2,16 +2,16 @@
 
 ## Visão geral
 
-Monorepo preparado para escalar:
+Monorepo:
 
 ```
 wps-car/
 ├── apps/
-│   ├── api/          # NestJS + Prisma (backend)
-│   └── web/          # Next.js (frontend) — próxima fase
+│   ├── api/          # NestJS + Prisma
+│   └── web/          # Next.js (export estático)
 ├── docs/
 ├── docker-compose.yml
-└── .env.example
+└── render.yaml
 ```
 
 ## Multi-tenant
@@ -20,91 +20,69 @@ wps-car/
 
 | Decisão | Motivo |
 |--------|--------|
-| `tenantId` em todas as entidades de negócio | Simples de operar, migrações únicas, custo baixo |
-| Unicidade composta `(tenantId, placa)`, `(tenantId, documento)` | Mesma placa pode existir em revendas diferentes |
-| `User.tenantId` opcional | `MODERATOR` é usuário de plataforma (sem tenant) |
-| Índices em `tenantId` + filtros frequentes | Performance em listagens paginadas |
+| `tenantId` em entidades de negócio | Operação simples, migrações únicas |
+| Unicidade `(tenantId, placa)`, `(tenantId, documento)` | Mesma placa em revendas diferentes |
+| `User.tenantId` opcional | `MODERATOR` é usuário de plataforma |
+| `tenant_branches` + `branchId` | Filiais e escopo gerente/vendedor |
 
-**Isolamento na aplicação (fase API):**
+**Isolamento na API:**
 
-1. JWT inclui `tenantId` e `role`
-2. `TenantContext` (request-scoped) injetado por guard
-3. Repositórios **sempre** aplicam `where: { tenantId }`
-4. Prisma middleware como segunda linha de defesa (opcional)
-
-## Clean Architecture (NestJS)
-
-```
-apps/api/src/
-├── domain/           # Entidades, value objects, regras puras
-├── application/      # Use cases, DTOs, interfaces de repositório
-├── infrastructure/   # Prisma, storage, FIPE externo
-└── presentation/     # Controllers, guards, filters, pipes
-```
-
-**Fluxo:** Controller → Service/UseCase → Repository → Prisma
-
-## RBAC
-
-- **Papel base** (`UserRole`): MODERATOR, ADMIN, MANAGER, SELLER
-- **Permissões granulares** (`Permission` + `RolePermission`): ex. `vehicles:create`
-- **Override** (`UserPermission`): exceções por usuário
-
-## Resultado financeiro (domínio)
-
-Calculado no **service de domínio**, persistido em `VehicleFinancial`.
-
-Documento funcional completo (critérios de aceite e regras de negócio): [FINANCIAL-RESULT.md](./FINANCIAL-RESULT.md)
-
-```
-Total de custos  = Soma dos custos vinculados
-Lucro bruto      = ValorVenda - ValorCompra - Custos
-Margem R$        = ValorVenda - ValorCompra - Custos
-Comissão         = Regra vigente (congelada após venda SOLD/COMPLETED)
-Resultado líquido = ValorVenda - ValorCompra - Custos - Comissão
-Margem %         = (Resultado líquido / ValorVenda) × 100  (quando venda > 0)
-Dias em estoque  = data_venda - data_compra (ou hoje - compra se em estoque)
-```
-
-**Comissão congelada:** ao finalizar a venda, o valor é gravado em `Sale.commission` e não muda quando regras do vendedor/revenda forem alteradas posteriormente.
-
-Compra inteligente:
-
-```
-ValorSugeridoCompra = ValorFIPE - MargemDesejada - CustosEstimados
-```
-
-## Upload
-
-- `AttachmentStorageProvider`: LOCAL | S3
-- Paths por tenant: `uploads/{tenantId}/{entityType}/{id}/`
-- Interface `StorageService` para trocar implementação sem alterar domínio
+1. JWT inclui `tenantId`, `role`, permissões
+2. `TenantContext` (request-scoped)
+3. Repositórios aplicam `where: { tenantId }`
+4. `DataScopeService` restringe gerente/vendedor por filial
 
 ## Estrutura API (`apps/api/src`)
 
 ```
 src/
-├── config/              # env validation
-├── domain/              # exceções de domínio
-├── application/         # repositórios base (tenant-scoped)
-├── infrastructure/      # prisma, tenant context
-├── modules/             # auth, health, …
-├── common/              # guards, filters, decorators, DTOs
-├── app.module.ts
-└── main.ts
+├── config/
+├── domain/
+├── application/         # repositórios base tenant-scoped
+├── infrastructure/      # prisma, tenant, mail, storage
+├── modules/             # auth, sales, settings, platform, notifications…
+└── common/              # guards, filters, decorators
 ```
 
-## Roadmap de módulos
+**Fluxo:** Controller → Service → Repository → Prisma
 
-1. ✅ Modelagem Prisma + Docker
-2. ✅ NestJS base (auth JWT, tenant guard, RBAC, error filter, logger)
-3. ✅ Módulo Tenant + Users
-4. ✅ Módulo Veículos + Estoque
-5. ✅ Clientes / Fornecedores
-6. ✅ Financeiro + Custos + Resultado
-7. ✅ Vendas + Comissões
-8. ✅ Configurações
-9. ✅ Dashboards (relatórios detalhados em fase futura)
-10. ⬜ Compra inteligente (FIPE)
-11. ⬜ Frontend Next.js
-12. ⬜ Testes
+## RBAC
+
+- **Papéis:** MODERATOR, ADMIN, MANAGER, SELLER
+- **Permissões:** `Permission` + `RolePermission` + override `UserPermission`
+- **Gestão de perfil:** admin define itens do menu para MANAGER/SELLER (`tenant_settings.profile_access`)
+
+## Módulos principais
+
+| Módulo | Função |
+|--------|--------|
+| `auth` | JWT, login, forgot/reset password |
+| `tenants` / `users` | Empresa e usuários da revenda |
+| `platform` | Métricas SaaS (moderador) |
+| `settings` | Catálogos, filiais, e-mails, gestão de perfil |
+| `notifications` | Dispatch de e-mails tipados |
+| `sales` / `financial` | Vendas e resultado por veículo |
+| `reports` | PDF/Excel e relatório geral |
+
+## Frontend
+
+Next.js em `apps/web` — rotas `(app)` para revenda, `(moderator)` para plataforma. Ver [FRONTEND.md](./FRONTEND.md).
+
+## Resultado financeiro
+
+Calculado no domínio, persistido em `VehicleFinancial`. Spec: [product/FINANCIAL-RESULT.md](./product/FINANCIAL-RESULT.md)
+
+```
+Lucro bruto      = ValorVenda - ValorCompra - Custos
+Comissão         = Regra vigente (congelada em Sale.commission após SOLD/COMPLETED)
+Resultado líquido = ValorVenda - ValorCompra - Custos - Comissão
+```
+
+## Upload
+
+- Local: `./uploads/{tenantId}/...` — no Render o disco é efêmero; usar S3 em produção futura.
+
+## E-mail
+
+- Configuração por tipo em `/settings/email-notifications`
+- SMTP via `MAIL_*` / `SMTP_*` — ver [ENV.md](./ENV.md)

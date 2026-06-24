@@ -7,6 +7,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Calculator, Loader2, RefreshCw } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { hasPermission } from '@/lib/permissions';
+import { useAuth } from '@/providers/auth-provider';
+import { PricingIntelligencePanel } from '@/components/pricing-intelligence/pricing-intelligence-panel';
 import {
   toFinancialFormValues,
   toFinancialUpdatePayload,
@@ -29,8 +32,15 @@ export function VehicleFinancialForm({
   canUpdate: boolean;
 }) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canUsePricing = hasPermission(user, 'pricing-intelligence:read');
   const [marginPercent, setMarginPercent] = useState('12');
   const [estimatedCosts, setEstimatedCosts] = useState<number | undefined>();
+  const [estimatedCostsInitialized, setEstimatedCostsInitialized] = useState(false);
+
+  useEffect(() => {
+    setEstimatedCostsInitialized(false);
+  }, [vehicleId]);
 
   const financialQuery = useQuery({
     queryKey: ['vehicles', vehicleId, 'financial'],
@@ -104,9 +114,13 @@ export function VehicleFinancialForm({
   useEffect(() => {
     if (financialQuery.data) {
       reset(toFinancialFormValues(financialQuery.data));
-      setEstimatedCosts(parseFloat(financialQuery.data.totalCosts) || undefined);
+      if (!estimatedCostsInitialized) {
+        const total = parseFloat(financialQuery.data.totalCosts);
+        setEstimatedCosts(Number.isNaN(total) || total <= 0 ? undefined : total);
+        setEstimatedCostsInitialized(true);
+      }
     }
-  }, [financialQuery.data, reset]);
+  }, [financialQuery.data, reset, estimatedCostsInitialized]);
 
   const saveMutation = useMutation({
     mutationFn: (values: VehicleFinancialFormValues) =>
@@ -148,8 +162,10 @@ export function VehicleFinancialForm({
       });
     },
     onSuccess: (result) => {
-      setValue('suggestedPurchaseValue', parseFloat(result.suggestedPurchaseValue));
-      queryClient.invalidateQueries({ queryKey: ['vehicles', vehicleId, 'financial'] });
+      setValue('fipeValue', parseFloat(result.fipeValue), { shouldDirty: true });
+      setValue('suggestedPurchaseValue', parseFloat(result.suggestedPurchaseValue), {
+        shouldDirty: true,
+      });
       toast.success('Valor sugerido de compra calculado');
     },
     onError: (err) => {
@@ -260,6 +276,18 @@ export function VehicleFinancialForm({
             </Button>
           </CardContent>
         </Card>
+      ) : null}
+
+      {canUsePricing ? (
+        <PricingIntelligencePanel
+          vehicleId={vehicleId}
+          canApplyListing={canUpdate}
+          onApplyListing={(value) => {
+            setValue('listedValue', value, { shouldDirty: true });
+            setValue('minimumValue', Math.round(value * 0.95), { shouldDirty: true });
+            toast.success('Valores sugeridos aplicados ao anúncio');
+          }}
+        />
       ) : null}
 
       <Card>

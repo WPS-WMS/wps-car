@@ -20,7 +20,7 @@ Base: `/vehicles/{vehicleId}/financial`
 
 ### Resultado calculado (automático)
 
-Regras de negócio e critérios de aceite: [FINANCIAL-RESULT.md](./FINANCIAL-RESULT.md)
+Regras de negócio e critérios de aceite: [product/FINANCIAL-RESULT.md](./product/FINANCIAL-RESULT.md)
 
 | Campo | Fórmula |
 |-------|---------|
@@ -77,7 +77,7 @@ Base: `/vehicles/{vehicleId}/costs`
 | PATCH | `/{costId}` | `costs:create` | Atualiza + recalcula |
 | DELETE | `/{costId}` | `costs:create` | Remove + recalcula |
 
-**Tipos:** `PAINTING`, `MECHANICS`, `BODYWORK`, `SANITIZATION`, `DOCUMENTATION`, `TRANSPORT`, `REVISION`, `OTHER`
+**Tipos:** `PAINTING`, `MECHANICS`, `BODYWORK`, `SANITIZATION`, `DOCUMENTATION`, `DISPATCHER`, `TRANSPORT`, `TOWING`, `ADVERTISING`, `COMMISSION`, `WASHING`, `REVISION`, `OTHER`
 
 ### Exemplo
 

@@ -98,6 +98,35 @@ enum StockMovementType {
   RELEASE // Liberação de reserva
 }
 
+enum ExportJobType {
+  STOCK
+  SALES
+  SUMMARY
+}
+
+enum ExportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AuditAction {
+  AUTH_LOGIN_SUCCESS
+  AUTH_LOGIN_FAILED
+  AUTH_LOGOUT
+  AUTH_LOGOUT_ALL
+  AUTH_PASSWORD_RESET
+  AUTH_REFRESH_REUSE
+  AUTH_2FA_ENABLED
+  AUTH_2FA_DISABLED
+  AUTH_2FA_FAILED
+  USER_PASSWORD_RESET
+  USER_PERMISSIONS_UPDATED
+  VEHICLE_DELETED
+  SALE_CREATED
+}
+
 // -----------------------------------------------------------------------------
 // Enums — Pessoas (Cliente / Fornecedor)
 // -----------------------------------------------------------------------------
@@ -186,6 +215,47 @@ enum AttachmentEntityType {
   SUPPLIER
 }
 
+enum VehicleDocumentType {
+  CRLV
+  INVOICE
+  PURCHASE_CONTRACT
+  SALE_CONTRACT
+  CAUTELAR_REPORT
+  OTHER
+}
+
+enum LeadSource {
+  WHATSAPP
+  PHONE
+  STORE
+  WEBSITE
+  REFERRAL
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum ContactChannel {
+  PHONE
+  WHATSAPP
+  EMAIL
+  VISIT
+  OTHER
+}
+
+enum ReminderStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
 enum AttachmentStorageProvider {
   LOCAL
   S3
@@ -229,6 +299,9 @@ model Tenant {
   configStatuses       ConfigStatus[]
   configEmailTemplates ConfigEmailTemplate[]
   branches             TenantBranch[]
+  exportJobs           ExportJob[]
+  auditLogs            AuditLog[]
+  leads                Lead[]
 
   @@map("tenants")
 }
@@ -254,6 +327,9 @@ model User {
   createdById  String?   @map("created_by_id")
   updatedById  String?   @map("updated_by_id")
   branchId     String?   @map("branch_id") // null = matriz (tenant)
+  tokenVersion Int       @default(0) @map("token_version")
+  totpSecret   String?   @map("totp_secret")
+  totpEnabled  Boolean   @default(false) @map("totp_enabled")
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch TenantBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -264,10 +340,14 @@ model User {
   updatedUsers User[] @relation("UserUpdatedBy")
 
   refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   rolePermissions     UserPermission[] // overrides por usuário (opcional)
   assignedCustomers   Customer[]       @relation("CustomerAssignedSeller")
   salesAsSeller       Sale[]           @relation("SaleSeller")
   opportunities       Opportunity[]
+  assignedLeads       Lead[]               @relation("LeadAssignedSeller")
+  leadContacts        LeadContact[]
+  sellerReminders     SellerReminder[]
   stockMovements      StockMovement[]
   vehicleCostsResponsible VehicleCost[] @relation("VehicleCostResponsible")
   vehicleCostsCreated     VehicleCost[] @relation("VehicleCostCreatedBy")
@@ -275,6 +355,8 @@ model User {
   vehiclesUpdated       Vehicle[]          @relation("VehicleUpdatedBy")
   vehicleFinancialsSold VehicleFinancial[] @relation("VehicleFinancialSeller")
   commissionRule        SellerCommissionRule?
+  exportJobsRequested   ExportJob[]
+  auditLogs             AuditLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -287,6 +369,7 @@ model RefreshToken {
   tenantId  String?  @map("tenant_id")
   userId    String   @map("user_id")
   tokenHash String   @map("token_hash")
+  familyId  String?  @map("family_id")
   expiresAt DateTime @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime @default(now()) @map("created_at")
@@ -296,7 +379,23 @@ model RefreshToken {
 
   @@index([userId])
   @@index([tokenHash])
+  @@index([familyId])
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
 }
 
 /// Permissões granulares por módulo (RBAC complementar ao role)
@@ -379,6 +478,7 @@ model Vehicle {
   stockMovements  StockMovement[]
   sales           Sale[]
   opportunities   Opportunity[]
+  leadInterests   LeadVehicleInterest[]
   commissionOverrides VehicleCommissionOverride[]
 
   @@unique([tenantId, licensePlate])
@@ -395,6 +495,7 @@ model VehiclePhoto {
   vehicleId String   @map("vehicle_id")
   fileName  String   @map("file_name")
   filePath  String   @map("file_path")
+  thumbnailPath String? @map("thumbnail_path")
   mimeType  String?  @map("mime_type")
   sizeBytes Int?     @map("size_bytes")
   sortOrder Int      @default(0) @map("sort_order")
@@ -445,6 +546,8 @@ model VehicleFinancial {
   seller   User?     @relation("VehicleFinancialSeller", fields: [sellerId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
+  @@index([tenantId, saleDate])
+  @@index([tenantId, sellerId, saleDate])
   @@map("vehicle_financials")
 }
 
@@ -475,6 +578,7 @@ model VehicleCost {
 
   @@index([tenantId, vehicleId])
   @@index([tenantId, costDate])
+  @@index([tenantId, vehicleId, costDate])
   @@map("vehicle_costs")
 }
 
@@ -533,6 +637,7 @@ model Customer {
 
   sales         Sale[]
   opportunities Opportunity[]
+  leads         Lead[]
   financials    VehicleFinancial[]
   history       CustomerHistory[]
 
@@ -638,6 +743,8 @@ model Sale {
   @@index([tenantId, saleDate])
   @@index([tenantId, sellerId])
   @@index([tenantId, status])
+  @@index([tenantId, status, saleDate])
+  @@index([tenantId, sellerId, saleDate])
   @@map("sales")
 }
 
@@ -651,6 +758,7 @@ model Opportunity {
   amount      Decimal?          @db.Decimal(14, 2)
   status      OpportunityStatus @default(OPEN)
   notes       String?
+  nextFollowUpAt DateTime?      @map("next_follow_up_at")
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
 
@@ -658,9 +766,101 @@ model Opportunity {
   vehicle  Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   seller   User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  reminders SellerReminder[]
 
   @@index([tenantId, sellerId, status])
   @@map("opportunities")
+}
+
+// =============================================================================
+// CRM COMERCIAL — leads, interesse, contatos e lembretes
+// =============================================================================
+
+model Lead {
+  id               String     @id @default(uuid())
+  tenantId         String     @map("tenant_id")
+  name             String
+  phone            String?
+  email            String?
+  source           LeadSource @default(OTHER)
+  status           LeadStatus @default(NEW)
+  sellerId         String?    @map("seller_id")
+  customerId       String?    @map("customer_id")
+  expectedAmount   Decimal?   @map("expected_amount") @db.Decimal(14, 2)
+  notes            String?
+  nextFollowUpAt   DateTime?  @map("next_follow_up_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  createdById      String?    @map("created_by_id")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  seller   User?     @relation("LeadAssignedSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contacts LeadContact[]
+  interests LeadVehicleInterest[]
+  reminders SellerReminder[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, sellerId, status])
+  @@index([tenantId, nextFollowUpAt])
+  @@map("leads")
+}
+
+model LeadVehicleInterest {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  leadId    String   @map("lead_id")
+  vehicleId String   @map("vehicle_id")
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, vehicleId])
+  @@index([tenantId, vehicleId])
+  @@map("lead_vehicle_interests")
+}
+
+model LeadContact {
+  id          String         @id @default(uuid())
+  tenantId    String         @map("tenant_id")
+  leadId      String         @map("lead_id")
+  channel     ContactChannel @default(OTHER)
+  summary     String
+  contactedAt DateTime       @map("contacted_at")
+  userId      String?        @map("user_id")
+  metadata    Json?
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  lead Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, leadId, contactedAt])
+  @@map("lead_contacts")
+}
+
+model SellerReminder {
+  id              String         @id @default(uuid())
+  tenantId        String         @map("tenant_id")
+  userId          String         @map("user_id")
+  title           String
+  description     String?
+  dueAt           DateTime       @map("due_at")
+  status          ReminderStatus @default(PENDING)
+  leadId          String?        @map("lead_id")
+  opportunityId   String?        @map("opportunity_id")
+  vehicleId       String?        @map("vehicle_id")
+  autoGenerated   Boolean        @default(false) @map("auto_generated")
+  completedAt     DateTime?      @map("completed_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, status, dueAt])
+  @@map("seller_reminders")
 }
 
 // =============================================================================
@@ -849,14 +1049,14 @@ model Attachment {
   entityId   String                    @map("entity_id")
   fileName   String                    @map("file_name")
   filePath   String                    @map("file_path")
-  mimeType   String?                   @map("mime_type")
-  sizeBytes  Int?                      @map("size_bytes")
-  storage    AttachmentStorageProvider @default(LOCAL)
-  createdAt  DateTime                  @default(now()) @map("created_at")
-
-  // Polimórfico: entityType + entityId (sem FK rígida para flexibilidade)
+  mimeType     String?                   @map("mime_type")
+  sizeBytes    Int?                      @map("size_bytes")
+  documentType VehicleDocumentType?      @map("document_type")
+  storage      AttachmentStorageProvider @default(LOCAL)
+  createdAt    DateTime                  @default(now()) @map("created_at")
 
   @@index([tenantId, entityType, entityId])
+  @@index([tenantId, entityType, entityId, documentType])
   @@map("attachments")
 }
 
@@ -879,4 +1079,78 @@ model PurchaseIntelligenceQuery {
   @@index([tenantId])
   @@index([tenantId, licensePlate, createdAt])
   @@map("purchase_intelligence_queries")
+}
+
+// =============================================================================
+// PRECIFICAÇÃO INTELIGENTE — histórico de sugestões de preço de venda
+// =============================================================================
+
+model PricingIntelligenceQuery {
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  vehicleId          String   @map("vehicle_id")
+  userId             String?  @map("user_id")
+  fipeValue          Decimal? @map("fipe_value") @db.Decimal(14, 2)
+  marketReference    Decimal? @map("market_reference") @db.Decimal(14, 2)
+  minMarginPercent   Decimal  @map("min_margin_percent") @db.Decimal(8, 4)
+  conservativePrice  Decimal  @map("conservative_price") @db.Decimal(14, 2)
+  competitivePrice   Decimal  @map("competitive_price") @db.Decimal(14, 2)
+  aggressivePrice    Decimal  @map("aggressive_price") @db.Decimal(14, 2)
+  idealListingPrice  Decimal  @map("ideal_listing_price") @db.Decimal(14, 2)
+  minimumRecommended Decimal  @map("minimum_recommended") @db.Decimal(14, 2)
+  rawResponse        Json?    @map("raw_response")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, vehicleId, createdAt])
+  @@map("pricing_intelligence_queries")
+}
+
+// =============================================================================
+// RELATÓRIOS — exportações assíncronas
+// =============================================================================
+
+model ExportJob {
+  id            String          @id @default(uuid())
+  tenantId      String          @map("tenant_id")
+  requestedById String          @map("requested_by_id")
+  type          ExportJobType
+  format        String
+  status        ExportJobStatus @default(PENDING)
+  params        Json
+  filePath      String?         @map("file_path")
+  fileName      String?         @map("file_name")
+  mimeType      String?         @map("mime_type")
+  errorMessage  String?         @map("error_message")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  completedAt   DateTime?       @map("completed_at")
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, requestedById])
+  @@map("export_jobs")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  tenantId   String?     @map("tenant_id")
+  userId     String?     @map("user_id")
+  action     AuditAction
+  entityType String?     @map("entity_type")
+  entityId   String?     @map("entity_id")
+  metadata   Json?
+  ipAddress  String?     @map("ip_address")
+  userAgent  String?     @map("user_agent")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
 }

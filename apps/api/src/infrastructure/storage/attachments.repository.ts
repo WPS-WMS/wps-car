@@ -28,6 +28,17 @@ export class AttachmentsRepository extends TenantScopedRepository {
     });
   }
 
+  findAllByEntity(entityType: AttachmentEntityType, entityId: string) {
+    return this.prisma.attachment.findMany({
+      where: {
+        tenantId: this.tenantId(),
+        entityType,
+        entityId,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   findManyByEntities(entityType: AttachmentEntityType, entityIds: string[]) {
     if (entityIds.length === 0) return Promise.resolve([]);
     return this.prisma.attachment.findMany({
@@ -37,6 +48,15 @@ export class AttachmentsRepository extends TenantScopedRepository {
         entityId: { in: entityIds },
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  findById(id: string) {
+    return this.prisma.attachment.findFirst({
+      where: {
+        id,
+        tenantId: this.tenantId(),
+      },
     });
   }
 

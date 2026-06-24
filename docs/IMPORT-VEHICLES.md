@@ -20,10 +20,12 @@ Suporta as **duas empresas demo** (Alpha e Beta) com login automático por tenan
 
 ## Empresas demo
 
-| Tenant | CNPJ (login) | Admin (senha `Admin@123`) |
-|--------|----------------|---------------------------|
-| Alpha | `00000000000191` | `admin@revendademo.com.br` |
-| Beta | `11222333000181` | `admin@revendabeta.com.br` |
+| Tenant | E-mail admin (senha `Admin@123`) |
+|--------|----------------------------------|
+| Alpha | `admin@revendademo.com.br` |
+| Beta | `admin@revendabeta.com.br` |
+
+Login na API/script: e-mail + senha (CNPJ opcional na API).
 
 ---
 

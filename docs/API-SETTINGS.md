@@ -4,12 +4,12 @@
 
 | Método | Rota | Permissão | Descrição |
 |--------|------|-----------|-----------|
-| GET | `/settings` | `settings:read` | Todas as configurações (merge com padrões) |
-| GET | `/settings/defaults` | `settings:read` | Valores padrão do sistema |
+| GET | `/settings` | `settings:read` | Configurações (merge com padrões) |
+| GET | `/settings/defaults` | `settings:read` | Valores padrão |
 | PATCH | `/settings` | `settings:update` | Atualiza em lote |
 
 ```json
-PATCH /api/v1/settings
+PATCH /settings
 {
   "settings": {
     "default_margin_percent": 12,
@@ -21,21 +21,75 @@ PATCH /api/v1/settings
 }
 ```
 
-### Chaves conhecidas
-
 | Chave | Descrição |
 |-------|-----------|
-| `default_margin_percent` | Margem padrão de venda (%) |
-| `default_purchase_margin_percent` | Margem padrão na compra (%) |
-| `estimated_prep_costs_default` | Custos estimados de preparação (R$) |
-| `company_display_name` | Nome exibido |
-| `notification_email` | E-mail de notificações |
+| `notification_email` | Remetente e destino de avisos internos |
+
+---
+
+## Gestão de perfil (menu lateral)
+
+| Método | Rota | Permissão / Role |
+|--------|------|------------------|
+| GET | `/settings/profile-access` | `settings:read` |
+| PUT | `/settings/profile-access` | `settings:update` + ADMIN |
+
+Define quais itens do sidebar **Gerente** e **Vendedor** podem ver. Admin sempre tem acesso total.
+
+```json
+PUT /settings/profile-access
+{
+  "role": "SELLER",
+  "enabledFeatures": ["dashboard", "vehicles", "stock", "sales", "customers"]
+}
+```
+
+---
+
+## E-mails por tipo
+
+Usado pelo frontend em `/configuracoes/emails`.
+
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| GET | `/settings/email-notifications` | `settings:read` |
+| PUT | `/settings/email-notifications/recipients` | `settings:update` |
+| PUT | `/settings/email-notifications/:code` | `settings:update` |
+
+**Tipos:** `sale_completed`, `sale_registered`, `vehicle_reserved`, `user_welcome`, `password_reset`
+
+**Destinatários por perfil:** matriz Vendedor / Gerente / Administrador em `email_notification_recipients` (tenant_settings). Tipos com destinatário fixo (`user_welcome`, `password_reset`) não usam a matriz.
+
+```json
+PUT /settings/email-notifications/recipients
+{
+  "rules": [
+    { "code": "sale_registered", "roles": ["ADMIN", "MANAGER"] },
+    { "code": "sale_completed", "roles": [] }
+  ]
+}
+```
+
+```json
+PUT /settings/email-notifications/sale_completed
+{
+  "active": true,
+  "subject": "Parabéns pela compra!",
+  "bodyHtml": "<p>Olá {{customerName}}</p>"
+}
+```
+
+Variáveis: `{{customerName}}`, `{{vehicleName}}`, `{{resetLink}}`, etc. (listadas na resposta GET).
+
+**Envio:** requer SMTP configurado — ver [ENV.md](./ENV.md). Com `MAIL_ENABLED=false`, conteúdo vai para o log da API.
+
+**Disparos automáticos:** nova venda, venda finalizada, usuário criado, forgot-password.
 
 ---
 
 ## Catálogos
 
-Padrão CRUD para cada recurso: `GET`, `POST`, `PATCH /:id`, `PATCH /:id/deactivate`
+CRUD: `GET`, `POST`, `PATCH /:id`, `PATCH /:id/deactivate`
 
 | Recurso | Base |
 |---------|------|
@@ -43,60 +97,21 @@ Padrão CRUD para cada recurso: `GET`, `POST`, `PATCH /:id`, `PATCH /:id/deactiv
 | Tipos de custo | `/settings/cost-types` |
 | Formas de pagamento | `/settings/payment-methods` |
 | Status customizados | `/settings/statuses` |
-| Templates de e-mail | `/settings/email-templates` |
-| Filiais (vinculadas ao tenant/matriz) | `/settings/branches` |
+| Filiais | `/settings/branches` |
 
-**Query comum:** `?activeOnly=true`
+**Legado (não usado pelo frontend):** `/settings/email-templates` — preferir `/settings/email-notifications`.
 
-### Filiais (matriz = tenant)
+Query comum: `?activeOnly=true`
 
-A **matriz** é o registro em `tenants` (empresa do SaaS). **Filiais** são unidades (`tenant_branches`) com `tenantId` apontando para essa matriz.
+### Filiais
+
+Matriz = registro `tenants`. Filiais = `tenant_branches`.
 
 ```json
-POST /api/v1/settings/branches
+POST /settings/branches
 {
   "name": "Filial Campinas",
   "address": "Av. Exemplo, 100",
   "phone": "19999999999"
 }
 ```
-
-### Status
-
-```json
-POST /api/v1/settings/statuses
-{
-  "entity": "vehicle",
-  "name": "Em análise",
-  "code": "under_review",
-  "color": "#FFA500",
-  "sortOrder": 10
-}
-```
-
-**Entidades sugeridas:** `vehicle`, `sale`
-
-### Template de e-mail
-
-```json
-POST /api/v1/settings/email-templates
-{
-  "code": "sale_completed",
-  "subject": "Compra concluída",
-  "bodyHtml": "<p>Olá {{customerName}}</p>"
-}
-```
-
-### Item de catálogo
-
-```json
-POST /api/v1/settings/vehicle-types
-{
-  "name": "SUV",
-  "code": "suv",
-  "sortOrder": 5,
-  "active": true
-}
-```
-
-`code`: apenas `a-z`, `0-9` e `_`

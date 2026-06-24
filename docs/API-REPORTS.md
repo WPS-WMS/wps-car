@@ -15,7 +15,7 @@ Resposta: arquivo binário com `Content-Disposition: attachment`.
 
 ## Relatório geral (JSON)
 
-Documento funcional completo (banco, regras, critérios de aceite): [GENERAL-REPORT.md](./GENERAL-REPORT.md)
+Documento funcional completo: [product/GENERAL-REPORT.md](./product/GENERAL-REPORT.md)
 
 `GET /reports/general`
 

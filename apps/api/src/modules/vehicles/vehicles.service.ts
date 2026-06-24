@@ -14,6 +14,8 @@ import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { ListVehiclesQueryDto } from './dto/list-vehicles-query.dto';
 import { VehiclesRepository } from './repositories/vehicles.repository';
+import { AuditAction } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { FinancialRecalculationService } from '../financial/services/financial-recalculation.service';
 
 @Injectable()
@@ -23,6 +25,7 @@ export class VehiclesService {
     private readonly tenantContext: TenantContextService,
     private readonly dataScope: DataScopeService,
     private readonly recalculationService: FinancialRecalculationService,
+    private readonly audit: AuditService,
   ) {}
 
   async findAll(query: ListVehiclesQueryDto, actor: AuthenticatedUser) {
@@ -197,7 +200,7 @@ export class VehiclesService {
     return toVehicleResponse(refreshed!);
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor: AuthenticatedUser) {
     const vehicle = await this.vehiclesRepository.findById(id);
     if (!vehicle) {
       throw new DomainException('VEHICLE_NOT_FOUND', 'Veículo não encontrado', 404);
@@ -212,6 +215,20 @@ export class VehiclesService {
     }
 
     await this.vehiclesRepository.delete(id);
+
+    await this.audit.log({
+      action: AuditAction.VEHICLE_DELETED,
+      userId: actor.id,
+      tenantId: actor.tenantId,
+      entityType: 'vehicle',
+      entityId: id,
+      metadata: {
+        brand: vehicle.brand,
+        model: vehicle.model,
+        licensePlate: vehicle.licensePlate,
+      },
+    });
+
     return { message: 'Veículo excluído' };
   }
 }

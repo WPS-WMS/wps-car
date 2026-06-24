@@ -21,7 +21,9 @@ export class UsersRepository extends TenantScopedRepository {
 
     const where: Prisma.UserWhereInput = {
       tenantId,
-      ...(query.role && { role: query.role }),
+      ...(query.role
+        ? { role: query.role }
+        : { role: { not: UserRole.MODERATOR } }),
       ...(query.active !== undefined && { active: query.active }),
       ...(query.search && {
         OR: [
@@ -89,10 +91,16 @@ export class UsersRepository extends TenantScopedRepository {
   }
 
   async revokeAllSessions(userId: string) {
-    return this.prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    return this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { tokenVersion: { increment: 1 } },
+      }),
+    ]);
   }
 
   async replacePermissionOverrides(

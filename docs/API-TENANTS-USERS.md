@@ -11,60 +11,62 @@ Campos **não editáveis** em `/tenants/me`: `status`, `plan`, `cnpj`.
 
 ## Empresas — plataforma (moderador)
 
-| Método | Rota | Permissão | Descrição |
-|--------|------|-----------|-----------|
-| GET | `/tenants` | `tenants:read` | Lista paginada |
-| POST | `/tenants` | `tenants:manage` | Cria empresa |
-| GET | `/tenants/:id` | `tenants:read` | Detalhe |
-| PATCH | `/tenants/:id` | `tenants:manage` | Atualiza (todos os campos) |
+Exige `@Roles(MODERATOR)`. Ver [API-PLATFORM.md](./API-PLATFORM.md).
 
-**Query:** `page`, `limit`, `search`, `status`, `plan`, `sortBy`, `sortOrder`
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| GET | `/tenants` | `tenants:read` |
+| POST | `/tenants` | `tenants:manage` |
+| GET | `/tenants/:id` | `tenants:read` |
+| PATCH | `/tenants/:id` | `tenants:manage` |
 
 ## Usuários — dentro da revenda
 
 | Método | Rota | Permissão | Descrição |
 |--------|------|-----------|-----------|
-| GET | `/users` | `users:read` | Lista paginada |
+| GET | `/users` | `users:read` | Lista (exclui MODERATOR) |
 | GET | `/users/:id` | `users:read` | Detalhe |
 | POST | `/users` | `users:create` | Cria usuário |
 | PATCH | `/users/:id` | `users:update` | Edita usuário |
-| PATCH | `/users/:id/deactivate` | `users:delete` | Inativa + revoga sessões |
-| POST | `/users/:id/reset-password` | `users:update` | Nova senha |
-| PUT | `/users/:id/permissions` | `users:update` | Overrides de permissão |
+| PATCH | `/users/:id/deactivate` | `users:delete` | Inativa |
+| POST | `/users/:id/reset-password` | `users:update` | Nova senha (admin) |
+| PUT | `/users/:id/permissions` | `users:update` | Overrides |
 
-| GET | `/permissions` | `users:update` | Catálogo de permissões |
+| GET | `/permissions` | `users:update` | Catálogo |
 
-**Query usuários:** `page`, `limit`, `search`, `role`, `active`
+**Query:** `page`, `limit`, `search`, `role`, `active`
 
 ### Criar usuário
 
 ```json
-POST /api/v1/users
+POST /users
 {
   "name": "João Vendedor",
   "email": "joao@revenda.com",
   "password": "Senha@123",
-  "role": "SELLER"
+  "role": "SELLER",
+  "branchId": "uuid-filial-ou-null-matriz"
 }
 ```
 
-Perfis permitidos: `ADMIN`, `MANAGER`, `SELLER`.
+Perfis permitidos: `ADMIN`, `MANAGER`, `SELLER` — **não** `MODERATOR`.
 
-### Permissões customizadas
+Gerente e vendedor devem ter `branchId` (filial ou null = matriz).
+
+### Comissão do vendedor (PATCH)
 
 ```json
-PUT /api/v1/users/{id}/permissions
+PATCH /users/:id
 {
-  "permissions": [
-    { "code": "vehicles:create", "granted": true },
-    { "code": "reports:read", "granted": false }
-  ]
+  "commissionType": "PERCENTAGE",
+  "commissionValue": 2.5
 }
 ```
 
-## Regras de negócio
+Também via UI `/configuracoes/comissao-vendedor`. Dispara e-mail `user_welcome` ao criar usuário (se tipo ativo).
 
-- Não é possível inativar a si mesmo.
-- Deve existir pelo menos um `ADMIN` ativo por empresa.
-- Inativação revoga todos os refresh tokens do usuário.
-- Reset de senha também revoga sessões.
+## Regras
+
+- Pelo menos um ADMIN ativo por empresa
+- Inativação/reset revoga refresh tokens
+- Moderador não listável nem criável por admin da revenda

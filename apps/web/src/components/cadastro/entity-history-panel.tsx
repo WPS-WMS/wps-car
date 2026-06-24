@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/format';
 import { historyActionLabels } from '@/lib/person-labels';
 import type { EntityHistoryEntry } from '@/types/api';
 import { Button } from '@/components/ui/button';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
@@ -114,28 +115,11 @@ export function EntityHistoryPanel({
           </ul>
         )}
 
-        {meta && meta.totalPages > 1 ? (
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              Anterior
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={page >= meta.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Próxima
-            </Button>
-          </div>
-        ) : null}
+        <PaginationControls
+          meta={meta ? { page, totalPages: meta.totalPages } : null}
+          onPageChange={setPage}
+          align="end"
+        />
       </CardContent>
     </Card>
   );

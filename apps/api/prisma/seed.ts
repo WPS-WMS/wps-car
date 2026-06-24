@@ -42,6 +42,10 @@ const PERMISSIONS: { code: string; module: string; description: string }[] = [
   { code: 'settings:read', module: 'settings', description: 'Consultar configurações' },
   { code: 'settings:update', module: 'settings', description: 'Editar configurações' },
   { code: 'purchase-intelligence:read', module: 'purchase', description: 'Compra inteligente' },
+  { code: 'pricing-intelligence:read', module: 'pricing', description: 'Precificação inteligente' },
+  { code: 'crm:read', module: 'crm', description: 'Consultar CRM comercial' },
+  { code: 'crm:create', module: 'crm', description: 'Cadastrar leads e oportunidades' },
+  { code: 'crm:update', module: 'crm', description: 'Atualizar CRM comercial' },
 ];
 
 const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
@@ -61,6 +65,8 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'dashboard:read',
     'settings:read',
     'purchase-intelligence:read',
+    'pricing-intelligence:read',
+    'crm:read', 'crm:create', 'crm:update',
   ],
   SELLER: [
     'vehicles:read',
@@ -71,6 +77,8 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'reports:read',
     'dashboard:read',
     'purchase-intelligence:read',
+    'pricing-intelligence:read',
+    'crm:read', 'crm:create', 'crm:update',
   ],
 };
 

@@ -81,4 +81,43 @@ export class StockRepository extends TenantScopedRepository {
 
     return { data, total, page, limit };
   }
+
+  async findSalesByVehicle(vehicleId: string, limit = 20) {
+    return this.prisma.sale.findMany({
+      where: { vehicleId, tenantId: this.tenantId() },
+      orderBy: { saleDate: 'desc' },
+      take: limit,
+      include: {
+        customer: { select: { id: true, name: true, document: true, phone: true } },
+        seller: { select: { id: true, name: true, email: true } },
+        vehicle: {
+          select: { id: true, brand: true, model: true, licensePlate: true, status: true },
+        },
+      },
+    });
+  }
+
+  async findCostsByVehicle(vehicleId: string, limit = 50) {
+    return this.prisma.vehicleCost.findMany({
+      where: { vehicleId, tenantId: this.tenantId() },
+      orderBy: { costDate: 'desc' },
+      take: limit,
+      include: {
+        supplier: { select: { id: true, name: true } },
+        responsible: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  async findMovementsByVehicle(vehicleId: string, limit = 20) {
+    return this.prisma.stockMovement.findMany({
+      where: { vehicleId, tenantId: this.tenantId() },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
 }

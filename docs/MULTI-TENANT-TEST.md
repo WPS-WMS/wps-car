@@ -61,6 +61,10 @@ npm run import:vehicles:beta               # só Beta (3 itens)
 
 Detalhes das colunas do CSV: [IMPORT-VEHICLES.md](./IMPORT-VEHICLES.md).
 
+## Moderador (plataforma)
+
+Login: `moderator@wpscar.com.br` / `Moderator@123` → tela `/plataforma` com métricas por empresa. Ver [API-PLATFORM.md](./API-PLATFORM.md).
+
 ## Criar empresa pela API (plataforma)
 
 Usuário **moderador** (`moderator@wpscar.com.br`) pode chamar `POST /tenants`, mas isso **não** cria admin nem catálogos — use o seed ou crie usuário manualmente depois.

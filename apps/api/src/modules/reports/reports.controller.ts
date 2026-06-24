@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, Body, Res } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -6,12 +6,17 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { ExportReportQueryDto } from './dto/export-report-query.dto';
+import { CreateExportJobDto } from './dto/create-export-job.dto';
 import { GeneralReportQueryDto } from './dto/general-report-query.dto';
+import { ExportJobsService } from './export-jobs.service';
 import { ReportsService } from './reports.service';
 
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly exportJobsService: ExportJobsService,
+  ) {}
 
   @Get('general')
   @Permissions('reports:read')
@@ -54,6 +59,35 @@ export class ReportsController {
     @Res() res: Response,
   ) {
     const file = await this.reportsService.exportSummary(actor, query);
+    this.sendFile(res, file.buffer, file.filename, file.mimeType);
+  }
+
+  @Post('exports')
+  @Permissions('reports:read')
+  createExportJob(
+    @Body() dto: CreateExportJobDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.exportJobsService.create(actor, dto);
+  }
+
+  @Get('exports/:id')
+  @Permissions('reports:read')
+  getExportJob(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.exportJobsService.getStatus(id, actor);
+  }
+
+  @Get('exports/:id/download')
+  @Permissions('reports:read')
+  async downloadExportJob(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const file = await this.exportJobsService.getDownloadFile(id, actor);
     this.sendFile(res, file.buffer, file.filename, file.mimeType);
   }
 

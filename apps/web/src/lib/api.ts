@@ -4,6 +4,7 @@ import {
   getRefreshToken,
   setAuthSession,
 } from './auth-storage';
+import { notifyNetworkError, notifySessionExpired } from './notify-api-error';
 import type {
   ApiSuccess,
   AuthUser,
@@ -27,14 +28,32 @@ import type {
   FinancialResultSummary,
   SuggestPurchaseResult,
   LoginResponse,
+  TwoFactorSetupResponse,
+  TwoFactorStatus,
   ManagerDashboard,
   PaginatedResponse,
+  PlateLookupResponse,
+  PurchaseIntelligenceAnalysis,
+  PurchaseIntelligenceHistoryItem,
+  PricingIntelligenceAnalysis,
+  PricingIntelligenceHistoryItem,
+  CrmLead,
+  CrmLeadDetail,
+  CrmOpportunity,
+  CrmReminder,
+  CrmFunnel,
+  VehicleDocument,
+  VehicleDocumentType,
   Sale,
   SellerDashboard,
   SellerRanking,
   StockItem,
   CommissionReportResponse,
   GeneralReportResponse,
+  PlatformMetricsResponse,
+  ExportJobResponse,
+  ProfileAccessResponse,
+  EmailNotificationsConfiguration,
 } from '@/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -50,7 +69,7 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = RequestInit & { skipAuth?: boolean };
+type RequestOptions = RequestInit & { skipAuth?: boolean; silent?: boolean };
 
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
@@ -68,16 +87,18 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   const data = (await res.json()) as LoginResponse;
-  setAuthSession(data.accessToken, data.refreshToken, data.user);
-  return data.accessToken;
+  if (data.accessToken && data.refreshToken && data.user) {
+    setAuthSession(data.accessToken, data.refreshToken, data.user);
+    return data.accessToken;
+  }
+  return null;
 }
 
-export async function apiRequest<T>(
-  path: string,
-  options: RequestOptions = {},
-): Promise<T> {
-  const { skipAuth, headers, ...rest } = options;
-  const url = path.startsWith('http') ? path : `${API_URL}${path}`;
+async function fetchWithAuthRetry(
+  url: string,
+  options: RequestOptions,
+): Promise<Response> {
+  const { skipAuth, silent, headers, ...rest } = options;
 
   const buildHeaders = (token: string | null) => ({
     'Content-Type': 'application/json',
@@ -87,20 +108,57 @@ export async function apiRequest<T>(
 
   let token = skipAuth ? null : getAccessToken();
 
-  let response = await fetch(url, {
-    ...rest,
-    headers: buildHeaders(token),
-  });
+  const doFetch = () =>
+    fetch(url, {
+      ...rest,
+      headers: buildHeaders(token),
+    });
+
+  let response: Response;
+  try {
+    response = await doFetch();
+  } catch {
+    if (!silent) {
+      notifyNetworkError();
+    }
+    throw new ApiError('Sem conexão com o servidor', 0, 'NETWORK_ERROR');
+  }
 
   if (response.status === 401 && !skipAuth) {
     token = await refreshAccessToken();
     if (token) {
-      response = await fetch(url, {
-        ...rest,
-        headers: buildHeaders(token),
-      });
+      try {
+        response = await doFetch();
+      } catch {
+        if (!silent) {
+          notifyNetworkError();
+        }
+        throw new ApiError('Sem conexão com o servidor', 0, 'NETWORK_ERROR');
+      }
+    } else {
+      if (!silent) {
+        notifySessionExpired();
+      }
+      throw new ApiError('Sessão expirada', 401, 'SESSION_EXPIRED');
     }
   }
+
+  if (response.status === 401 && !skipAuth) {
+    if (!silent) {
+      notifySessionExpired();
+    }
+    throw new ApiError('Sessão expirada', 401, 'SESSION_EXPIRED');
+  }
+
+  return response;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const url = path.startsWith('http') ? path : `${API_URL}${path}`;
+  const response = await fetchWithAuthRetry(url, options);
 
   if (response.status === 204) {
     return undefined as T;
@@ -130,28 +188,55 @@ function unwrap<T>(body: T | ApiSuccess<T>): T {
 
 async function apiFormRequest<T>(
   path: string,
-  options: { method?: string; body: FormData },
+  options: { method?: string; body: FormData; silent?: boolean },
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
   const authHeaders = (token: string | null): HeadersInit =>
     token ? { Authorization: `Bearer ${token}` } : {};
 
   let token = getAccessToken();
-  let response = await fetch(url, {
-    method: options.method ?? 'POST',
-    headers: authHeaders(token),
-    body: options.body,
-  });
+
+  const doFetch = () =>
+    fetch(url, {
+      method: options.method ?? 'POST',
+      headers: authHeaders(token),
+      body: options.body,
+    });
+
+  let response: Response;
+  try {
+    response = await doFetch();
+  } catch {
+    if (!options.silent) {
+      notifyNetworkError();
+    }
+    throw new ApiError('Sem conexão com o servidor', 0, 'NETWORK_ERROR');
+  }
 
   if (response.status === 401) {
     token = await refreshAccessToken();
     if (token) {
-      response = await fetch(url, {
-        method: options.method ?? 'POST',
-        headers: authHeaders(token),
-        body: options.body,
-      });
+      try {
+        response = await doFetch();
+      } catch {
+        if (!options.silent) {
+          notifyNetworkError();
+        }
+        throw new ApiError('Sem conexão com o servidor', 0, 'NETWORK_ERROR');
+      }
+    } else {
+      if (!options.silent) {
+        notifySessionExpired();
+      }
+      throw new ApiError('Sessão expirada', 401, 'SESSION_EXPIRED');
     }
+  }
+
+  if (response.status === 401) {
+    if (!options.silent) {
+      notifySessionExpired();
+    }
+    throw new ApiError('Sessão expirada', 401, 'SESSION_EXPIRED');
   }
 
   if (response.status === 204) {
@@ -183,9 +268,65 @@ export const api = {
       body: JSON.stringify(payload),
       skipAuth: true,
     });
-    setAuthSession(data.accessToken, data.refreshToken, data.user);
+
+    if (data.requiresTwoFactor) {
+      return data;
+    }
+
+    if (data.accessToken && data.refreshToken && data.user) {
+      setAuthSession(data.accessToken, data.refreshToken, data.user);
+    }
+
     return data;
   },
+
+  verifyTwoFactor: async (payload: { twoFactorToken: string; code: string }) => {
+    const data = await apiRequest<LoginResponse>('/auth/2fa/verify', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      skipAuth: true,
+    });
+
+    if (data.accessToken && data.refreshToken && data.user) {
+      setAuthSession(data.accessToken, data.refreshToken, data.user);
+    }
+
+    return data;
+  },
+
+  getTwoFactorStatus: () =>
+    apiRequest<TwoFactorStatus | ApiSuccess<TwoFactorStatus>>('/auth/2fa/status').then(unwrap),
+
+  setupTwoFactor: () =>
+    apiRequest<TwoFactorSetupResponse | ApiSuccess<TwoFactorSetupResponse>>('/auth/2fa/setup', {
+      method: 'POST',
+    }).then(unwrap),
+
+  enableTwoFactor: (code: string) =>
+    apiRequest<{ message: string } | ApiSuccess<{ message: string }>>('/auth/2fa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }).then(unwrap),
+
+  disableTwoFactor: (payload: { code: string; password: string }) =>
+    apiRequest<{ message: string } | ApiSuccess<{ message: string }>>('/auth/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then(unwrap),
+
+  forgotPassword: (email: string) =>
+    apiRequest<{ message: string } | ApiSuccess<{ message: string }>>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+      skipAuth: true,
+    }).then(unwrap),
+
+  resetPasswordWithToken: (payload: { token: string; newPassword: string }) =>
+    apiRequest<{ message: string } | ApiSuccess<{ message: string }>>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      skipAuth: true,
+    }).then(unwrap),
 
   me: () => apiRequest<AuthUser | ApiSuccess<AuthUser>>('/auth/me').then(unwrap),
 
@@ -206,6 +347,66 @@ export const api = {
       if (v !== undefined && v !== '') qs.set(k, String(v));
     });
     return apiRequest<PaginatedResponse<StockItem>>(`/stock?${qs}`);
+  },
+
+  lookupStockByPlate: (plate: string) =>
+    apiRequest<PlateLookupResponse | ApiSuccess<PlateLookupResponse>>(
+      `/stock/plate/${encodeURIComponent(plate.trim())}/lookup`,
+    ).then(unwrap),
+
+  analyzePurchaseIntelligence: (payload: {
+    licensePlate: string;
+    desiredMarginPercent?: number;
+    estimatedCosts?: number;
+  }) =>
+    apiRequest<
+      PurchaseIntelligenceAnalysis | ApiSuccess<PurchaseIntelligenceAnalysis>
+    >('/purchase-intelligence/analyze', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then(unwrap),
+
+  getPurchaseIntelligenceHistory: (params?: {
+    page?: number;
+    limit?: number;
+    licensePlate?: string;
+  }) => {
+    const qs = new URLSearchParams({
+      page: String(params?.page ?? 1),
+      limit: String(params?.limit ?? 10),
+    });
+    if (params?.licensePlate) qs.set('licensePlate', params.licensePlate);
+    return apiRequest<
+      PaginatedResponse<PurchaseIntelligenceHistoryItem> | ApiSuccess<
+        PaginatedResponse<PurchaseIntelligenceHistoryItem>
+      >
+    >(`/purchase-intelligence/history?${qs}`).then(unwrap);
+  },
+
+  analyzePricingIntelligence: (payload: {
+    vehicleId: string;
+    minMarginPercent?: number;
+  }) =>
+    apiRequest<PricingIntelligenceAnalysis | ApiSuccess<PricingIntelligenceAnalysis>>(
+      '/pricing-intelligence/analyze',
+      { method: 'POST', body: JSON.stringify(payload) },
+    ).then(unwrap),
+
+  getPricingIntelligenceHistory: (params?: {
+    page?: number;
+    limit?: number;
+    vehicleId?: string;
+  }) => {
+    const qs = new URLSearchParams({
+      page: String(params?.page ?? 1),
+      limit: String(params?.limit ?? 10),
+    });
+    if (params?.vehicleId) qs.set('vehicleId', params.vehicleId);
+    return apiRequest<
+      PaginatedResponse<PricingIntelligenceHistoryItem> | ApiSuccess<
+        PaginatedResponse<PricingIntelligenceHistoryItem>
+      >
+    >(`/pricing-intelligence/history?${qs}`).then(unwrap);
   },
 
   getSales: (params: Record<string, string | number | undefined>) => {
@@ -691,4 +892,158 @@ export const api = {
 
   deactivateConfigEmailTemplate: (id: string) =>
     apiRequest(`/settings/email-templates/${id}/deactivate`, { method: 'PATCH' }),
+
+  getPlatformMetrics: (params?: { page?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    return apiRequest<PlatformMetricsResponse | ApiSuccess<PlatformMetricsResponse>>(
+      `/platform/metrics${query ? `?${query}` : ''}`,
+    ).then(unwrap);
+  },
+
+  createReportExport: (payload: {
+    type: ExportJobResponse['type'];
+    format: 'pdf' | 'xlsx';
+    branchId?: string;
+    sellerId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }) =>
+    apiRequest<ExportJobResponse | ApiSuccess<ExportJobResponse>>('/reports/exports', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then(unwrap),
+
+  getReportExport: (id: string) =>
+    apiRequest<ExportJobResponse | ApiSuccess<ExportJobResponse>>(
+      `/reports/exports/${id}`,
+    ).then(unwrap),
+
+  getProfileAccess: () =>
+    apiRequest<ProfileAccessResponse | ApiSuccess<ProfileAccessResponse>>(
+      '/settings/profile-access',
+    ).then(unwrap),
+
+  updateProfileAccess: (payload: { role: 'MANAGER' | 'SELLER'; enabledFeatures: string[] }) =>
+    apiRequest<ProfileAccessResponse | ApiSuccess<ProfileAccessResponse>>(
+      '/settings/profile-access',
+      { method: 'PUT', body: JSON.stringify(payload) },
+    ).then(unwrap),
+
+  getEmailNotifications: () =>
+    apiRequest<
+      EmailNotificationsConfiguration | ApiSuccess<EmailNotificationsConfiguration>
+    >('/settings/email-notifications').then(unwrap),
+
+  updateEmailNotification: (
+    code: string,
+    payload: { active: boolean; subject: string; bodyHtml: string },
+  ) =>
+    apiRequest<ConfigEmailTemplate | ApiSuccess<ConfigEmailTemplate>>(
+      `/settings/email-notifications/${code}`,
+      { method: 'PUT', body: JSON.stringify(payload) },
+    ).then(unwrap),
+
+  updateEmailNotificationRecipients: (payload: {
+    rules: Array<{ code: string; roles: Array<'ADMIN' | 'MANAGER' | 'SELLER'> }>;
+  }) =>
+    apiRequest<{ recipients: Record<string, string[]> } | ApiSuccess<{ recipients: Record<string, string[]> }>>(
+      '/settings/email-notifications/recipients',
+      { method: 'PUT', body: JSON.stringify(payload) },
+    ).then(unwrap),
+
+  getCrmFunnel: () =>
+    apiRequest<CrmFunnel | ApiSuccess<CrmFunnel>>('/crm/funnel').then(unwrap),
+
+  getCrmLeads: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    source?: string;
+    sellerId?: string;
+  }) => {
+    const qs = new URLSearchParams({
+      page: String(params?.page ?? 1),
+      limit: String(params?.limit ?? 20),
+    });
+    if (params?.status) qs.set('status', params.status);
+    if (params?.source) qs.set('source', params.source);
+    if (params?.sellerId) qs.set('sellerId', params.sellerId);
+    return apiRequest<PaginatedResponse<CrmLead>>(`/crm/leads?${qs}`);
+  },
+
+  getCrmLead: (id: string) =>
+    apiRequest<CrmLeadDetail | ApiSuccess<CrmLeadDetail>>(`/crm/leads/${id}`).then(unwrap),
+
+  createCrmLead: (payload: Record<string, unknown>) =>
+    apiRequest<CrmLead | ApiSuccess<CrmLead>>('/crm/leads', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then(unwrap),
+
+  updateCrmLead: (id: string, payload: Record<string, unknown>) =>
+    apiRequest<CrmLead | ApiSuccess<CrmLead>>(`/crm/leads/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }).then(unwrap),
+
+  createCrmLeadContact: (leadId: string, payload: Record<string, unknown>) =>
+    apiRequest(`/crm/leads/${leadId}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then(unwrap),
+
+  createCrmLeadInterest: (leadId: string, payload: { vehicleId: string; notes?: string }) =>
+    apiRequest(`/crm/leads/${leadId}/interests`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then(unwrap),
+
+  getCrmOpportunities: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    sellerId?: string;
+  }) => {
+    const qs = new URLSearchParams({
+      page: String(params?.page ?? 1),
+      limit: String(params?.limit ?? 20),
+    });
+    if (params?.status) qs.set('status', params.status);
+    if (params?.sellerId) qs.set('sellerId', params.sellerId);
+    return apiRequest<PaginatedResponse<CrmOpportunity>>(`/crm/opportunities?${qs}`);
+  },
+
+  getCrmReminders: (params?: { page?: number; limit?: number; status?: string }) => {
+    const qs = new URLSearchParams({
+      page: String(params?.page ?? 1),
+      limit: String(params?.limit ?? 20),
+    });
+    if (params?.status) qs.set('status', params.status);
+    return apiRequest<PaginatedResponse<CrmReminder>>(`/crm/reminders?${qs}`);
+  },
+
+  completeCrmReminder: (id: string) =>
+    apiRequest(`/crm/reminders/${id}/complete`, { method: 'PATCH' }).then(unwrap),
+
+  getVehicleDocuments: (vehicleId: string) =>
+    apiRequest<VehicleDocument[] | ApiSuccess<VehicleDocument[]>>(
+      `/vehicles/${vehicleId}/documents`,
+    ).then(unwrap),
+
+  uploadVehicleDocument: (vehicleId: string, file: File, documentType: VehicleDocumentType) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('documentType', documentType);
+    return apiFormRequest<VehicleDocument>(`/vehicles/${vehicleId}/documents`, {
+      method: 'POST',
+      body: form,
+    });
+  },
+
+  deleteVehicleDocument: (vehicleId: string, documentId: string) =>
+    apiRequest(`/vehicles/${vehicleId}/documents/${documentId}`, { method: 'DELETE' }),
 };

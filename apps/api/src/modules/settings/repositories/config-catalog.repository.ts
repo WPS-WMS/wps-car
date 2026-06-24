@@ -168,6 +168,12 @@ export class ConfigCatalogRepository {
     });
   }
 
+  findEmailTemplateByCode(code: string) {
+    return this.prisma.configEmailTemplate.findFirst({
+      where: { code, tenantId: this.tenantId() },
+    });
+  }
+
   createEmailTemplate(data: {
     code: string;
     subject: string;

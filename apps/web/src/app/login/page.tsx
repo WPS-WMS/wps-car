@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Car, ShieldCheck, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { getAccessToken } from '@/lib/auth-storage';
 import { ApiError } from '@/lib/api';
+import { resetSessionRedirectFlag } from '@/lib/notify-api-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,11 +19,17 @@ const inputClass =
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
-  const [email, setEmail] = useState('admin@revendademo.com.br');
-  const [password, setPassword] = useState('Admin@123');
+  const { login, verifyTwoFactor, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [twoFactorToken, setTwoFactorToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    resetSessionRedirectFlag();
+  }, []);
 
   useEffect(() => {
     if (!isLoading && getAccessToken()) {
@@ -34,7 +42,10 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      if (result.requiresTwoFactor && result.twoFactorToken) {
+        setTwoFactorToken(result.twoFactorToken);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha no login');
     } finally {
@@ -42,9 +53,23 @@ export default function LoginPage() {
     }
   }
 
+  async function handleTwoFactorSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!twoFactorToken) return;
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      await verifyTwoFactor(twoFactorToken, twoFactorCode.replace(/\s/g, ''));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Código inválido');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Painel de apresentação — mesmo degradê da sidebar do app */}
       <aside className="relative hidden w-[min(48%,520px)] shrink-0 flex-col justify-between overflow-hidden bg-login-panel-gradient p-10 text-white lg:flex">
         <div
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(37,99,235,0.35)_0%,transparent_55%)]"
@@ -92,7 +117,6 @@ export default function LoginPage() {
         <p className="relative text-xs text-slate-500">© WPS Car — gestão automotiva</p>
       </aside>
 
-      {/* Formulário — mesmo fundo das telas internas */}
       <div className="flex flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-border bg-card px-6 py-4 lg:hidden">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 shadow-md">
@@ -112,59 +136,113 @@ export default function LoginPage() {
               </div>
               <div className="space-y-1">
                 <CardTitle className="text-xl font-bold text-foreground">
-                  Entrar na sua conta
+                  {twoFactorToken ? 'Verificação em duas etapas' : 'Entrar na sua conta'}
                 </CardTitle>
                 <CardDescription>
-                  Informe e-mail e senha para continuar
+                  {twoFactorToken
+                    ? 'Informe o código de 6 dígitos do seu aplicativo autenticador'
+                    : 'Informe e-mail e senha para continuar'}
                 </CardDescription>
               </div>
             </CardHeader>
             <CardContent>
-              <form noValidate onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    className={inputClass}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    className={inputClass}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                {error ? (
-                  <p
-                    className="rounded-[10px] bg-destructive/10 px-3 py-2 text-sm text-destructive ring-1 ring-destructive/20"
-                    role="alert"
+              {twoFactorToken ? (
+                <form noValidate onSubmit={handleTwoFactorSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="twoFactorCode">Código 2FA</Label>
+                    <Input
+                      id="twoFactorCode"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      required
+                      className={inputClass}
+                      value={twoFactorCode}
+                      onChange={(e) => setTwoFactorCode(e.target.value)}
+                      placeholder="000000"
+                    />
+                  </div>
+                  {error ? (
+                    <p
+                      className="rounded-[10px] bg-destructive/10 px-3 py-2 text-sm text-destructive ring-1 ring-destructive/20"
+                      role="alert"
+                    >
+                      {error}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="submit"
+                      className={cn('h-10 w-full rounded-[10px] text-sm font-semibold shadow-sm')}
+                      size="lg"
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Validando…' : 'Confirmar código'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setTwoFactorToken(null);
+                        setTwoFactorCode('');
+                        setError(null);
+                      }}
+                    >
+                      Voltar ao login
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <form noValidate onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      className={inputClass}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label htmlFor="password">Senha</Label>
+                      <Link
+                        href="/esqueci-senha"
+                        className="text-xs font-medium text-brand-700 hover:underline"
+                      >
+                        Esqueci minha senha
+                      </Link>
+                    </div>
+                    <Input
+                      id="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      className={inputClass}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </div>
+                  {error ? (
+                    <p
+                      className="rounded-[10px] bg-destructive/10 px-3 py-2 text-sm text-destructive ring-1 ring-destructive/20"
+                      role="alert"
+                    >
+                      {error}
+                    </p>
+                  ) : null}
+                  <Button
+                    type="submit"
+                    className={cn('h-10 w-full rounded-[10px] text-sm font-semibold shadow-sm')}
+                    size="lg"
+                    disabled={submitting}
                   >
-                    {error}
-                  </p>
-                ) : null}
-                <Button
-                  type="submit"
-                  className={cn('h-10 w-full rounded-[10px] text-sm font-semibold shadow-sm')}
-                  size="lg"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Entrando…' : 'Acessar plataforma'}
-                </Button>
-              </form>
-              <p className="mt-5 rounded-[10px] bg-accent px-3 py-2.5 text-center text-xs text-accent-foreground">
-                Demo Alpha: admin@revendademo.com.br · Beta: admin@revendabeta.com.br · Senha: Admin@123
-              </p>
+                    {submitting ? 'Entrando…' : 'Acessar plataforma'}
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>

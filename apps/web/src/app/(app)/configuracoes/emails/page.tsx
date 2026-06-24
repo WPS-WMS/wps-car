@@ -7,7 +7,7 @@ export default function EmailsConfigPage() {
   return (
     <SettingsPageShell
       title="E-mails de notificação"
-      description="Configure o e-mail de envio e os templates de mensagens"
+      description="Defina quem recebe cada e-mail automático e edite os modelos de mensagem"
     >
       <EmailNotificationsSettings />
     </SettingsPageShell>

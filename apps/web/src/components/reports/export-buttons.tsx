@@ -2,22 +2,10 @@
 
 import { useState } from 'react';
 import { FileDown, FileSpreadsheet } from 'lucide-react';
-import { downloadReport } from '@/lib/download';
+import { downloadReportAsync } from '@/lib/download';
 import { Button } from '@/components/ui/button';
 
 type ReportType = 'stock' | 'sales' | 'summary';
-
-const paths: Record<ReportType, string> = {
-  stock: '/reports/stock/export',
-  sales: '/reports/sales/export',
-  summary: '/reports/summary/export',
-};
-
-const baseNames: Record<ReportType, string> = {
-  stock: 'estoque',
-  sales: 'vendas',
-  summary: 'resumo-gerencial',
-};
 
 export function ExportButtons({
   report,
@@ -27,21 +15,20 @@ export function ExportButtons({
   params?: Record<string, string | undefined>;
 }) {
   const [loading, setLoading] = useState<'pdf' | 'xlsx' | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleExport(format: 'pdf' | 'xlsx') {
     setError(null);
+    setProgress(null);
     setLoading(format);
     try {
-      const stamp = new Date().toISOString().slice(0, 10);
-      await downloadReport(paths[report], `${baseNames[report]}-${stamp}.${format}`, {
-        format,
-        ...params,
-      });
+      await downloadReportAsync(report, format, params, setProgress);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao exportar');
     } finally {
       setLoading(null);
+      setProgress(null);
     }
   }
 
@@ -69,6 +56,9 @@ export function ExportButtons({
           {loading === 'xlsx' ? 'Gerando Excel…' : 'Excel'}
         </Button>
       </div>
+      {progress ? (
+        <p className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">{progress}</p>
+      ) : null}
       {error ? (
         <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{error}</p>
       ) : null}

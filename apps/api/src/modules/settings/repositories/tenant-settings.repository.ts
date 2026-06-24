@@ -24,6 +24,12 @@ export class TenantSettingsRepository extends TenantScopedRepository {
     });
   }
 
+  async findByKeyForTenant(tenantId: string, key: string) {
+    return this.prisma.tenantSetting.findUnique({
+      where: { tenantId_key: { tenantId, key } },
+    });
+  }
+
   async upsertMany(entries: { key: string; value: Prisma.InputJsonValue }[]) {
     const tenantId = this.tenantId();
 

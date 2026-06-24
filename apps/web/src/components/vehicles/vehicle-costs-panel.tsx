@@ -10,7 +10,7 @@ import { ExternalLink, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { vehicleCostTypeOptions } from '@/lib/financial-labels';
 import { formatCurrency, formatDate } from '@/lib/format';
-import { mediaUrl } from '@/lib/media';
+import { useAuthenticatedMediaDownload } from '@/hooks/use-authenticated-media';
 import type { VehicleCost } from '@/types/api';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -75,6 +75,7 @@ export function VehicleCostsPanel({
   canManage: boolean;
 }) {
   const { user } = useAuth();
+  const downloadMedia = useAuthenticatedMediaDownload();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -237,7 +238,6 @@ export function VehicleCostsPanel({
                 </TableHeader>
                 <TableBody>
                   {costs.map((cost) => {
-                    const receiptHref = mediaUrl(cost.receipt?.url);
                     return (
                       <TableRow key={cost.id}>
                         <TableCell>{formatDate(cost.costDate)}</TableCell>
@@ -248,17 +248,18 @@ export function VehicleCostsPanel({
                         <TableCell>{cost.supplier?.name ?? '—'}</TableCell>
                         <TableCell>{cost.responsible?.name ?? '—'}</TableCell>
                         <TableCell>
-                          {receiptHref ? (
-                            <a
-                              href={receiptHref}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                          {cost.receipt?.url ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                downloadMedia(cost.receipt?.url, cost.receipt?.fileName)
+                              }
                               className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline"
                             >
                               <FileText className="h-3.5 w-3.5" />
                               Ver
                               <ExternalLink className="h-3 w-3" />
-                            </a>
+                            </button>
                           ) : (
                             '—'
                           )}
@@ -384,14 +385,15 @@ export function VehicleCostsPanel({
                     <FileText className="h-4 w-4 shrink-0 text-brand-600" />
                     <span className="truncate">{existingReceiptLabel}</span>
                     {editing?.receipt ? (
-                      <a
-                        href={mediaUrl(editing.receipt.url) ?? '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          downloadMedia(editing.receipt?.url, editing.receipt?.fileName)
+                        }
                         className="text-brand-600 hover:underline"
                       >
                         Abrir
-                      </a>
+                      </button>
                     ) : null}
                     <Button
                       type="button"

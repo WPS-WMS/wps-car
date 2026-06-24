@@ -4,7 +4,11 @@ node_modules/
 # Environment
 .env
 .env.local
+.env.qa
 .env.*.local
+apps/api/.env
+apps/api/.env.local
+apps/api/.env.qa
 .firebaserc
 
 # Firebase

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Car, Coins, Receipt } from 'lucide-react';
+import { Car, Coins, FileStack, Receipt } from 'lucide-react';
 import type { Vehicle } from '@/types/api';
 import { vehicleEditHref } from '@/lib/edit-routes';
 import { hasPermission } from '@/lib/permissions';
@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VehicleForm } from './vehicle-form';
 import { VehicleFinancialForm } from './vehicle-financial-form';
 import { VehicleCostsPanel } from './vehicle-costs-panel';
+import { VehicleDocumentsPanel } from './vehicle-documents-panel';
 
-const TAB_IDS = ['dados', 'financeiro', 'custos'] as const;
+const TAB_IDS = ['dados', 'financeiro', 'custos', 'documentos'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 function isTabId(value: string | null): value is TabId {
@@ -35,16 +36,19 @@ export function VehicleEditTabs({
   const canUpdateFinancial = hasPermission(user, 'financial:update');
   const canReadCosts = hasPermission(user, 'costs:read');
   const canManageCosts = hasPermission(user, 'costs:create');
+  const canReadDocuments = hasPermission(user, 'vehicles:read');
+  const canManageDocuments = hasPermission(user, 'vehicles:update');
 
   const tabFromUrl = searchParams.get('tab');
   const activeTab: TabId = useMemo(() => {
     if (isTabId(tabFromUrl)) {
       if (tabFromUrl === 'financeiro' && !canReadFinancial) return 'dados';
       if (tabFromUrl === 'custos' && !canReadCosts) return 'dados';
+      if (tabFromUrl === 'documentos' && !canReadDocuments) return 'dados';
       return tabFromUrl;
     }
     return 'dados';
-  }, [tabFromUrl, canReadFinancial, canReadCosts]);
+  }, [tabFromUrl, canReadFinancial, canReadCosts, canReadDocuments]);
 
   const setTab = useCallback(
     (tab: string) => {
@@ -75,6 +79,12 @@ export function VehicleEditTabs({
             Custos
           </TabsTrigger>
         ) : null}
+        {canReadDocuments ? (
+          <TabsTrigger value="documentos">
+            <FileStack className="mr-2 h-4 w-4" />
+            Documentos
+          </TabsTrigger>
+        ) : null}
       </TabsList>
 
       <TabsContent value="dados">
@@ -95,6 +105,12 @@ export function VehicleEditTabs({
       {canReadCosts ? (
         <TabsContent value="custos">
           <VehicleCostsPanel vehicleId={vehicleId} canManage={canManageCosts} />
+        </TabsContent>
+      ) : null}
+
+      {canReadDocuments ? (
+        <TabsContent value="documentos">
+          <VehicleDocumentsPanel vehicleId={vehicleId} canManage={canManageDocuments} />
         </TabsContent>
       ) : null}
     </Tabs>

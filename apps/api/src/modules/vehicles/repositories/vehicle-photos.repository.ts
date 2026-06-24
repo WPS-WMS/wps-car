@@ -34,6 +34,7 @@ export class VehiclePhotosRepository {
     vehicleId: string;
     fileName: string;
     filePath: string;
+    thumbnailPath?: string | null;
     mimeType?: string;
     sizeBytes?: number;
     sortOrder?: number;

@@ -54,6 +54,7 @@ export class SalesRepository extends TenantScopedRepository {
           }
         : {}),
       ...(query.search && {
+        // Índices GIN pg_trgm (migration 20260618130000) + vehicles.license_plate_trgm_idx
         OR: [
           { notes: { contains: query.search, mode: 'insensitive' } },
           { customer: { name: { contains: query.search, mode: 'insensitive' } } },

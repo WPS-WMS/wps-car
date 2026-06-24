@@ -2,6 +2,9 @@
   "name": "wps-car",
   "private": true,
   "scripts": {
+    "dev:api": "npm run start:dev --prefix apps/api",
+    "dev:api:qa": "npm run start:dev:qa --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web",
     "deploy:qa": "firebase use qa && firebase deploy --only hosting"
   }
 }

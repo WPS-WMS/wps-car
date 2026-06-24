@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { MoreVertical, Plus } from 'lucide-react';
@@ -9,9 +10,10 @@ import { customerEditHref } from '@/lib/edit-routes';
 import { useAuth } from '@/providers/auth-provider';
 import { hasPermission } from '@/lib/permissions';
 import { formatAddress, personTypeLabels } from '@/lib/person-labels';
-import { PageHeader } from '@/components/layout/page-header';
+import { SettingsPageShell } from '@/components/settings/settings-page-shell';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { SearchBar } from '@/components/ui/search-bar';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -40,15 +42,16 @@ export default function ClientesPage() {
   const canCreate = hasPermission(user, 'customers:create');
   const canUpdate = hasPermission(user, 'customers:update');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [page, setPage] = useState(1);
 
   const query = useQuery({
-    queryKey: ['customers', 'list', { search, page }],
+    queryKey: ['customers', 'list', { search: debouncedSearch, page }],
     queryFn: () =>
       api.getCustomers({
         page,
         limit: 20,
-        ...(search ? { search } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
       }),
   });
 
@@ -56,17 +59,18 @@ export default function ClientesPage() {
   const meta = query.data?.meta;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Clientes" description="Clientes cadastrados na revenda">
+    <SettingsPageShell title="Clientes" description="Clientes cadastrados na revenda">
+      <div className="space-y-6">
         {canCreate ? (
-          <Link href="/clientes/novo" className={cn(buttonVariants())}>
-            <Plus className="h-4 w-4" />
-            Novo Cliente
-          </Link>
+          <div className="flex justify-end">
+            <Link href="/clientes/novo" className={cn(buttonVariants())}>
+              <Plus className="h-4 w-4" />
+              Novo Cliente
+            </Link>
+          </div>
         ) : null}
-      </PageHeader>
 
-      <SearchBar
+        <SearchBar
         placeholder="Buscar por nome, e-mail, telefone ou documento…"
         value={search}
         onChange={(v) => {
@@ -155,33 +159,10 @@ export default function ClientesPage() {
             </Table>
           </Card>
 
-          {meta && meta.totalPages > 1 ? (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Página {meta.page} de {meta.totalPages} ({meta.total} itens)
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasPreviousPage}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasNextPage}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Próxima
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <PaginationControls meta={meta} onPageChange={setPage} />
         </>
       )}
-    </div>
+      </div>
+    </SettingsPageShell>
   );
 }

@@ -56,6 +56,7 @@ export class VehiclePhotosService {
       vehicleId,
       fileName: saved.fileName,
       filePath: saved.filePath,
+      thumbnailPath: saved.thumbnailPath,
       mimeType: file.mimetype,
       sizeBytes: file.size,
       sortOrder: count,
@@ -84,7 +85,7 @@ export class VehiclePhotosService {
       throw new DomainException('PHOTO_NOT_FOUND', 'Foto não encontrada', 404);
     }
 
-    await this.storage.deleteFile(photo.filePath);
+    await this.storage.deleteFiles([photo.filePath, photo.thumbnailPath]);
     await this.photosRepository.delete(photoId);
 
     if (photo.isPrimary) {

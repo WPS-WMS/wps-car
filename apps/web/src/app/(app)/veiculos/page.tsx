@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, MoreVertical, SlidersHorizontal } from 'lucide-react';
@@ -16,6 +17,7 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { PageHeader } from '@/components/layout/page-header';
 import { SearchBar } from '@/components/ui/search-bar';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -36,18 +38,19 @@ export default function VeiculosPage() {
   const canCreate = hasPermission(user, 'vehicles:create');
   const canUpdate = hasPermission(user, 'vehicles:update');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [status, setStatus] = useState('');
   const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
 
   const query = useQuery({
-    queryKey: ['vehicles', 'list', { search, status, page, branchFilter, isAdmin }],
+    queryKey: ['vehicles', 'list', { search: debouncedSearch, status, page, branchFilter, isAdmin }],
     queryFn: () =>
       api.getVehicles({
         page,
         limit: 20,
-        ...(search ? { search } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
         ...(status ? { status } : {}),
         ...(isAdmin && branchFilter !== 'all' ? { branchId: branchFilter } : {}),
       }),
@@ -216,31 +219,7 @@ export default function VeiculosPage() {
             </Table>
           </Card>
 
-          {meta && meta.totalPages > 1 ? (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Página {meta.page} de {meta.totalPages} ({meta.total} itens)
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasPreviousPage}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!meta.hasNextPage}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Próxima
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <PaginationControls meta={meta} onPageChange={setPage} />
         </>
       )}
     </div>
